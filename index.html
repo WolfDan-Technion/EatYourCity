@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מפת צמחי מאכל</title>
+  <meta name="description" content="מפה שיתופית של מיקומי צמחי מאכל" />
+
+  <!-- Leaflet (map library) - CSS and JS from the unpkg CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Hebrew-friendly font from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" />
+
+  <style>
+    /* =========================================================
+       1. COLORS & BASICS (green nature palette)
+       ========================================================= */
+    :root {
+      --green-dark: #1f4d2b;
+      --green: #2e7d32;
+      --green-light: #66bb6a;
+      --green-pale: #e8f5e9;
+      --cream: #fbfaf5;
+      --text: #1d2a1f;
+      --muted: #5f6f62;
+      --warning-bg: #fff4d6;
+      --warning-text: #6b4e00;
+      --danger: #c62828;
+      --radius: 12px;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Rubik", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--cream);
+    }
+
+    /* The page is a vertical column: header, disclaimer, then the map area */
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* =========================================================
+       2. HEADER (title, search, buttons)
+       ========================================================= */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--green-dark);
+      color: #fff;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1500; /* above the map so the search dropdown is visible */
+    }
+
+    .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      padding: 9px 14px;
+      border: none;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-family: inherit;
+      direction: rtl;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 9px 16px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      background: var(--green-light);
+      color: #fff;
+      white-space: nowrap;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn.active { background: #f9a825; color: #222; }
+    .btn.secondary { background: #e0e0e0; color: var(--text); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Only shown on small screens (see media query below) */
+    #panelToggle { display: none; }
+
+    /* Search results dropdown (also used by the autocomplete in the form) */
+    .results-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      left: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      background: #fff;
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-height: 320px;
+      overflow-y: auto;
+      z-index: 2100;
+    }
+    .results-list:empty { display: none; }
+
+    .results-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .results-list li:hover { background: var(--green-pale); }
+    .results-list li.message { cursor: default; color: var(--muted); }
+    .results-list li.message.error { color: var(--danger); }
+    .results-list img, .results-list .no-img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--green-pale);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .results-list small { color: var(--muted); display: block; font-style: italic; }
+
+    /* =========================================================
+       3. SAFETY DISCLAIMER
+       ========================================================= */
+    .disclaimer {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      padding: 6px 16px;
+      font-size: 0.88rem;
+      text-align: center;
+      border-bottom: 1px solid #f0d48a;
+    }
+
+    /* =========================================================
+       4. MAP + SIDE PANEL
+       ========================================================= */
+    .main {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      direction: ltr; /* Leaflet controls work best left-to-right */
+    }
+
+    /* While in "add plant" mode the cursor becomes a crosshair */
+    #map.adding { cursor: crosshair; }
+
+    /* Popups are inside the LTR map, so we switch them back to RTL */
+    .leaflet-popup-content {
+      direction: rtl;
+      text-align: right;
+      font-family: "Rubik", system-ui, sans-serif;
+      font-size: 0.92rem;
+      min-width: 180px;
+    }
+    .leaflet-popup-content h3 { margin: 0 0 4px; color: var(--green-dark); }
+    .leaflet-popup-content p { margin: 4px 0; }
+    .leaflet-popup-content .sci { font-style: italic; color: var(--muted); }
+
+    /* Custom leaf marker */
+    .plant-marker {
+      font-size: 22px;
+      line-height: 32px;
+      text-align: center;
+      width: 32px;
+      height: 32px;
+      background: #fff;
+      border: 2px solid var(--green);
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .plant-marker span { display: inline-block; transform: rotate(45deg); }
+
+    /* "Locate me" button (a Leaflet control) */
+    .locate-btn {
+      width: 34px;
+      height: 34px;
+      font-size: 18px;
+      background: #fff;
+      border: none;
+    }
+
+    /* Banner shown while choosing a location for a new plant */
+    .add-hint {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f9a825;
+      color: #222;
+      padding: 8px 16px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      font-weight: 500;
+      display: none;
+    }
+    .add-hint.show { display: block; }
+
+    /* Side panel with the list of visible plants (on the right, because RTL) */
+    .side-panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: 300px;
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .side-panel header {
+      padding: 12px;
+      background: var(--green-pale);
+    }
+    .side-panel h2 { margin: 0 0 8px; font-size: 1.05rem; color: var(--green-dark); }
+    .side-panel input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+    #plantList {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      flex: 1;
+    }
+    #plantList li {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+    }
+    #plantList li:hover { background: var(--green-pale); }
+    #plantList li strong { display: block; }
+    #plantList li small { color: var(--muted); }
+    #plantList li.empty { cursor: default; color: var(--muted); text-align: center; }
+    .status-line {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      border-top: 1px solid #eee;
+    }
+
+    /* =========================================================
+       5. MODALS (plant info + add-plant form)
+       ========================================================= */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      padding: 16px;
+    }
+    .modal-backdrop.show { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 460px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 20px;
+      position: relative;
+    }
+    .modal h2 { margin-top: 0; color: var(--green-dark); }
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px; /* left = "end" side in RTL */
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--muted);
+    }
+
+    .plant-img {
+      width: 100%;
+      max-height: 240px;
+      object-fit: cover;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+    }
+    .info-table { width: 100%; border-collapse: collapse; }
+    .info-table th, .info-table td {
+      text-align: right;
+      padding: 6px 4px;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    .info-table th { color: var(--muted); font-weight: 500; width: 40%; }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+    .badge.edible { background: var(--green-pale); color: var(--green); border: 1px solid var(--green-light); }
+    .badge.not-edible { background: #f5f5f5; color: #616161; border: 1px solid #bdbdbd; }
+
+    .small-warning {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-top: 12px;
+    }
+
+    /* Form fields */
+    .form-row { margin-bottom: 12px; position: relative; }
+    .form-row label { display: block; font-weight: 500; margin-bottom: 4px; }
+    .form-row input, .form-row textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+    .form-row textarea { resize: vertical; min-height: 70px; }
+    .form-row .hint { font-size: 0.8rem; color: var(--muted); }
+    .form-row input[readonly] { background: #f6f6f6; }
+    .form-error { color: var(--danger); font-weight: 500; min-height: 1.2em; }
+    .form-actions { display: flex; gap: 8px; justify-content: flex-start; }
+
+    /* Small pop-up message at the bottom of the screen */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green-dark);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      z-index: 4000;
+      display: none;
+      max-width: 90vw;
+      text-align: center;
+    }
+    #toast.error { background: var(--danger); }
+    #toast.show { display: block; }
+
+    /* =========================================================
+       6. MOBILE LAYOUT (screens narrower than 700px)
+       ========================================================= */
+    @media (max-width: 700px) {
+      .topbar { padding: 8px 10px; gap: 8px; }
+      .logo { font-size: 1rem; }
+      .search-wrap { order: 3; flex-basis: 100%; }
+      #panelToggle { display: inline-block; }
+      .btn { padding: 8px 12px; font-size: 0.88rem; }
+      .disclaimer { font-size: 0.78rem; padding: 5px 10px; }
+
+      /* The side panel becomes a bottom sheet that can be opened/closed */
+      .side-panel {
+        top: auto;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        width: auto;
+        height: 45%;
+        border-radius: var(--radius) var(--radius) 0 0;
+        display: none;
+      }
+      .side-panel.open { display: flex; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ================= HEADER ================= -->
+  <header class="topbar">
+    <h1 class="logo">🌿 מפת צמחי מאכל</h1>
+
+    <!-- Plant search (Trefle) -->
+    <div class="search-wrap">
+      <input id="searchInput" type="search" autocomplete="off"
+             placeholder="חיפוש צמח באנגלית או בשם מדעי (למשל: fig, Ficus carica)" />
+      <ul id="searchResults" class="results-list"></ul>
+    </div>
+
+    <button id="addBtn" class="btn">➕ הוספת צמח</button>
+    <button id="panelToggle" class="btn secondary">📋 רשימה</button>
+  </header>
+
+  <!-- ================= SAFETY DISCLAIMER ================= -->
+  <div class="disclaimer" role="note">
+    ⚠️ <strong>אזהרת בטיחות:</strong> לעולם אל תאכלו צמח בר אלא אם אתם בטוחים ב-100% בזיהוי שלו.
+    המידע באתר נועד למטרות לימוד בלבד.
+  </div>
+
+  <!-- ================= MAP + SIDE PANEL ================= -->
+  <main class="main">
+    <div id="map"></div>
+    <div id="addHint" class="add-hint">לחצו על המפה כדי לבחור את מיקום הצמח</div>
+
+    <aside id="sidePanel" class="side-panel">
+      <header>
+        <h2>צמחים באזור המוצג (<span id="visibleCount">0</span>)</h2>
+        <input id="listFilter" type="search" placeholder="סינון לפי שם או הערה..." />
+      </header>
+      <ul id="plantList"></ul>
+      <div id="statusLine" class="status-line">טוען...</div>
+    </aside>
+  </main>
+
+  <!-- ================= MODAL: PLANT INFO (Trefle) ================= -->
+  <div id="infoModal" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="close-btn" data-close="infoModal" aria-label="סגירה">×</button>
+      <div id="infoContent"></div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: ADD PLANT FORM ================= -->
+  <div id="addModal" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="close-btn" data-close="addModal" aria-label="סגירה">×</button>
+      <h2>הוספת צמח למפה</h2>
+
+      <form id="addForm" novalidate>
+        <div class="form-row">
+          <label for="plantName">שם הצמח *</label>
+          <input id="plantName" type="text" maxlength="100" autocomplete="off"
+                 placeholder="הקלידו שם באנגלית לחיפוש, או כל שם חופשי" />
+          <ul id="nameSuggestions" class="results-list"></ul>
+          <div class="hint">בחירה מהרשימה תמלא אוטומטית את השם המדעי והחלק האכיל.</div>
+        </div>
+
+        <div class="form-row">
+          <label for="scientificName">שם מדעי</label>
+          <input id="scientificName" type="text" maxlength="150" readonly />
+        </div>
+
+        <div class="form-row">
+          <label for="ediblePart">חלק אכיל</label>
+          <input id="ediblePart" type="text" maxlength="200" placeholder="למשל: פירות, עלים" />
+        </div>
+
+        <div class="form-row">
+          <label for="notes">הערות</label>
+          <textarea id="notes" maxlength="500" placeholder="למשל: עץ ליד הספסל, מניב בקיץ"></textarea>
+        </div>
+
+        <div class="form-row">
+          <label>מיקום</label>
+          <input id="locationText" type="text" readonly />
+        </div>
+
+        <p id="formError" class="form-error"></p>
+
+        <div class="form-actions">
+          <button type="submit" id="saveBtn" class="btn">💾 שמירה</button>
+          <button type="button" class="btn secondary" data-close="addModal">ביטול</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- =====================================================================
+       JAVASCRIPT
+       type="module" lets us "import" the Firebase SDK straight from the CDN.
+       ===================================================================== -->
+  <script type="module">
+    // Firebase modular SDK (v10) from Google's CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, onSnapshot, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    /* =====================================================================
+       0. SETTINGS - paste your keys here
+       ===================================================================== */
+
+    // Trefle API token (https://trefle.io -> Account -> Access token).
+    // NOTE: anything in this file is public once it's on GitHub Pages,
+    // so anyone can see this token. That's OK for a free study project.
+    const TREFLE_TOKEN = "usr-SexKBwhaN920LOfA36I3iWJ3d4j0TqGvEdGNcirBaQM";
+
+    // About CORS: Trefle answers with "Access-Control-Allow-Origin: *",
+    // so it can be called directly from the browser. (Checked: it works.)
+    // That's why there is no need for the Perenual fallback.
+    const TREFLE_BASE = "https://trefle.io/api/v1";
+
+    // Firebase config: Firebase console -> Project settings -> "Your apps" -> Web app -> Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSDkGBuFxCUuFW4tKmIf1tQTBgSJyt3IU",
+      authDomain: "eatyourcity-d6421.firebaseapp.com",
+      projectId: "eatyourcity-d6421",
+      storageBucket: "eatyourcity-d6421.firebasestorage.app",
+      messagingSenderId: "573822195180",
+      appId: "1:573822195180:web:556b2a79a05badc6a3dcc9",
+      measurementId: "G-JRJV2DVL5R"
+    };
+
+    // Maximum text lengths (the same numbers are used in the Firestore rules)
+    const LIMITS = { name: 100, scientificName: 150, trefleSlug: 150, ediblePart: 200, notes: 500 };
+
+    /* =====================================================================
+       1. SMALL HELPER FUNCTIONS
+       ===================================================================== */
+
+    // Shortcut for document.getElementById
+    const $ = (id) => document.getElementById(id);
+
+    // Turns text into safe HTML (so users can't inject code through plant names)
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    // Only allow https image links (safety)
+    function safeImageUrl(url) {
+      return typeof url === "string" && url.startsWith("https://") ? url : "";
+    }
+
+    // Waits until the user stops typing before running fn (saves API calls)
+    function debounce(fn, delayMs) {
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delayMs);
+      };
+    }
+
+    // Shows a short message at the bottom of the screen
+    let toastTimer;
+    function showToast(message, isError = false) {
+      const toast = $("toast");
+      toast.textContent = message;
+      toast.className = "show" + (isError ? " error" : "");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => (toast.className = ""), 4000);
+    }
+
+    // Open / close a modal window by its id
+    function openModal(id) { $(id).classList.add("show"); }
+    function closeModal(id) { $(id).classList.remove("show"); }
+
+    // Any element with data-close="modalId" closes that modal
+    document.addEventListener("click", (e) => {
+      const target = e.target.closest("[data-close]");
+      if (target) closeModal(target.dataset.close);
+      // Clicking the dark background also closes the modal
+      if (e.target.classList.contains("modal-backdrop")) closeModal(e.target.id);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeModal("infoModal"); closeModal("addModal"); }
+    });
+
+    /* =====================================================================
+       2. THE MAP (Leaflet)
+       ===================================================================== */
+
+    // Two base layers: streets and satellite
+    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
+    const satelliteLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    });
+
+    // Create the map centered on Israel
+    const map = L.map("map", {
+      center: [31.5, 34.9],
+      zoom: 8,
+      layers: [streetLayer]
+    });
+
+    // Layer switcher (top-left, so it doesn't hide behind the side panel)
+    L.control.layers(
+      { "מפת רחובות": streetLayer, "לוויין": satelliteLayer },
+      null,
+      { position: "topleft", collapsed: true }
+    ).addTo(map);
+
+    // Custom "locate me" button
+    const LocateControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd() {
+        const div = L.DomUtil.create("div", "leaflet-bar");
+        const btn = L.DomUtil.create("button", "locate-btn", div);
+        btn.type = "button";
+        btn.title = "המיקום שלי";
+        btn.textContent = "📍";
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.on(btn, "click", locateMe);
+        return div;
+      }
+    });
+    map.addControl(new LocateControl());
+
+    let myLocationMarker = null;
+
+    function locateMe() {
+      if (!navigator.geolocation) {
+        showToast("הדפדפן שלך לא תומך באיתור מיקום", true);
+        return;
+      }
+      showToast("מאתר מיקום...");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const latlng = [pos.coords.latitude, pos.coords.longitude];
+          map.setView(latlng, 16);
+          if (myLocationMarker) myLocationMarker.remove();
+          myLocationMarker = L.circleMarker(latlng, {
+            radius: 9, color: "#fff", weight: 3, fillColor: "#1976d2", fillOpacity: 1
+          }).addTo(map).bindPopup("<div>אתם כאן</div>");
+          showToast("נמצא המיקום שלך");
+        },
+        (err) => {
+          const messages = {
+            1: "לא ניתנה הרשאה לגשת למיקום",
+            2: "לא ניתן לקבוע את המיקום כרגע",
+            3: "איתור המיקום לקח יותר מדי זמן"
+          };
+          showToast(messages[err.code] || "שגיאה באיתור המיקום", true);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    // The icon used for every plant marker
+    const plantIcon = L.divIcon({
+      className: "",
+      html: '<div class="plant-marker"><span>🌿</span></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -30]
+    });
+
+    /* =====================================================================
+       3. TREFLE API (plant information)
+       ===================================================================== */
+
+    // One function for all Trefle requests, with clear Hebrew errors
+    async function trefleRequest(path, params = {}) {
+      if (!TREFLE_TOKEN || TREFLE_TOKEN === "PASTE_TOKEN_HERE") {
+        throw new Error("לא הוגדר טוקן של Trefle בקוד");
+      }
+      const url = new URL(TREFLE_BASE + path);
+      url.searchParams.set("token", TREFLE_TOKEN);
+      for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+
+      let response;
+      try {
+        response = await fetch(url);
+      } catch {
+        // fetch() itself fails on no internet or when the browser blocks the request (CORS)
+        throw new Error("אין חיבור לשירות המידע על צמחים (בעיית רשת או CORS)");
+      }
+
+      if (response.status === 401) throw new Error("טוקן Trefle לא תקין");
+      if (response.status === 404) throw new Error("הצמח לא נמצא במאגר");
+      if (response.status === 429) throw new Error("יותר מדי בקשות - נסו שוב בעוד דקה");
+      if (!response.ok) throw new Error("שגיאה מהשרת של Trefle (" + response.status + ")");
+
+      return response.json();
+    }
+
+    // Search plants by name -> returns an array of results
+    async function searchPlants(query) {
+      const json = await trefleRequest("/plants/search", { q: query });
+      return json.data || [];
+    }
+
+    // Full details for one species, by its slug (e.g. "ficus-carica")
+    async function getSpecies(slug) {
+      const json = await trefleRequest("/species/" + encodeURIComponent(slug));
+      return json.data;
+    }
+
+    // Trefle gives edible_part as an array like ["fruits","leaves"] -> make it text
+    function ediblePartText(species) {
+      const parts = species && species.edible_part;
+      return Array.isArray(parts) && parts.length ? parts.join(", ") : "";
+    }
+
+    // Decide whether to show the "edible" badge
+    function isEdible(species) {
+      return species.edible === true || species.vegetable === true || ediblePartText(species) !== "";
+    }
+
+    // Turns true/false/null into Hebrew
+    function yesNo(value) {
+      if (value === true) return "כן";
+      if (value === false) return "לא";
+      return "לא ידוע";
+    }
+
+    // Draws a list of search results inside a <ul>; onPick runs when one is clicked
+    function renderResults(listEl, plants, onPick) {
+      listEl.innerHTML = "";
+      plants.slice(0, 12).forEach((plant) => {
+        const li = document.createElement("li");
+        const img = safeImageUrl(plant.image_url);
+        li.innerHTML = `
+          ${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy">` : '<div class="no-img">🌱</div>'}
+          <div>
+            <strong>${escapeHtml(plant.common_name || plant.scientific_name)}</strong>
+            <small>${escapeHtml(plant.scientific_name)}${plant.family ? " · " + escapeHtml(plant.family) : ""}</small>
+          </div>`;
+        li.addEventListener("click", () => onPick(plant));
+        listEl.appendChild(li);
+      });
+    }
+
+    // Shows a one-line message (loading / error / no results) inside a results list
+    function renderListMessage(listEl, text, isError = false) {
+      listEl.innerHTML = `<li class="message${isError ? " error" : ""}">${escapeHtml(text)}</li>`;
+    }
+
+    // Opens the info modal and fills it with species details
+    async function showPlantInfo(slug) {
+      const box = $("infoContent");
+      box.innerHTML = "<p>טוען מידע...</p>";
+      openModal("infoModal");
+
+      try {
+        const s = await getSpecies(slug);
+        const img = safeImageUrl(s.image_url);
+        const edible = isEdible(s);
+        box.innerHTML = `
+          <h2>${escapeHtml(s.common_name || s.scientific_name)}</h2>
+          <span class="badge ${edible ? "edible" : "not-edible"}">
+            ${edible ? "✅ אכיל" : "❔ לא ידוע כאכיל"}
+          </span>
+          ${img ? `<img class="plant-img" src="${escapeHtml(img)}" alt="${escapeHtml(s.scientific_name)}">` : ""}
+          <table class="info-table">
+            <tr><th>שם נפוץ</th><td>${escapeHtml(s.common_name || "—")}</td></tr>
+            <tr><th>שם מדעי</th><td><em>${escapeHtml(s.scientific_name)}</em></td></tr>
+            <tr><th>משפחה</th><td>${escapeHtml(s.family || "—")}${s.family_common_name ? " (" + escapeHtml(s.family_common_name) + ")" : ""}</td></tr>
+            <tr><th>אכיל?</th><td>${yesNo(s.edible)}</td></tr>
+            <tr><th>חלק אכיל</th><td>${escapeHtml(ediblePartText(s) || "—")}</td></tr>
+            <tr><th>ירק?</th><td>${yesNo(s.vegetable)}</td></tr>
+          </table>
+          <p class="small-warning">⚠️ המידע מגיע ממאגר Trefle ועלול להיות חלקי או שגוי.
+            אל תאכלו צמח בר בלי זיהוי ודאי של 100%.</p>`;
+      } catch (err) {
+        box.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    /* ---------- The search box in the header ---------- */
+    const searchInput = $("searchInput");
+    const searchResults = $("searchResults");
+    let searchCounter = 0; // used to ignore old, slow answers
+
+    async function runHeaderSearch() {
+      const query = searchInput.value.trim();
+      if (query.length < 2) { searchResults.innerHTML = ""; return; }
+
+      const myTurn = ++searchCounter;
+      renderListMessage(searchResults, "מחפש...");
+      try {
+        const plants = await searchPlants(query);
+        if (myTurn !== searchCounter) return; // a newer search already started
+        if (plants.length === 0) {
+          renderListMessage(searchResults, "לא נמצאו תוצאות. נסו שם באנגלית או שם מדעי.");
+          return;
+        }
+        renderResults(searchResults, plants, (plant) => {
+          searchResults.innerHTML = "";
+          showPlantInfo(plant.slug);
+        });
+      } catch (err) {
+        if (myTurn === searchCounter) renderListMessage(searchResults, err.message, true);
+      }
+    }
+
+    searchInput.addEventListener("input", debounce(runHeaderSearch, 500));
+    // Hide results when clicking somewhere else
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".search-wrap")) searchResults.innerHTML = "";
+    });
+
+    /* =====================================================================
+       4. FIREBASE / FIRESTORE (shared plant locations)
+       ===================================================================== */
+
+    let db = null;
+    const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+
+    if (firebaseReady) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+      } catch (err) {
+        console.error(err);
+        showToast("שגיאה בחיבור ל-Firebase - בדקו את ההגדרות", true);
+      }
+    }
+
+    if (!db) {
+      $("statusLine").textContent = "Firebase לא מוגדר - אי אפשר לטעון או לשמור צמחים.";
+      $("addBtn").disabled = true;
+      $("addBtn").title = "צריך להדביק את firebaseConfig בקוד";
+    }
+
+    // All plants we got from Firestore, and their map markers
+    const plants = new Map();   // id -> plant data
+    const markers = new Map();  // id -> Leaflet marker
+    const markersLayer = L.layerGroup().addTo(map);
+
+    // HTML shown in a marker's popup
+    function popupHtml(id, p) {
+      const date = p.createdAt && p.createdAt.toDate
+        ? p.createdAt.toDate().toLocaleDateString("he-IL") : "";
+      return `
+        <h3>${escapeHtml(p.name)}</h3>
+        ${p.scientificName ? `<p class="sci">${escapeHtml(p.scientificName)}</p>` : ""}
+        ${p.ediblePart ? `<p><strong>חלק אכיל:</strong> ${escapeHtml(p.ediblePart)}</p>` : ""}
+        ${p.notes ? `<p><strong>הערות:</strong> ${escapeHtml(p.notes)}</p>` : ""}
+        ${date ? `<p><small>נוסף ב-${escapeHtml(date)}</small></p>` : ""}
+        <button class="btn more-info-btn" data-id="${escapeHtml(id)}">ℹ️ מידע נוסף</button>`;
+    }
+
+    // "More info" button inside popups (the popup HTML is created later, so we listen on document)
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".more-info-btn");
+      if (!btn) return;
+      const p = plants.get(btn.dataset.id);
+      if (!p) return;
+      if (p.trefleSlug) {
+        showPlantInfo(p.trefleSlug);
+      } else {
+        // No Trefle link saved -> search by name instead
+        searchInput.value = p.scientificName || p.name;
+        searchInput.focus();
+        runHeaderSearch();
+      }
+    });
+
+    // Listen to the "plants" collection in real time
+    if (db) {
+      onSnapshot(
+        collection(db, "plants"),
+        (snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const id = change.doc.id;
+            const p = change.doc.data();
+
+            // Remove old marker (for "modified" and "removed")
+            if (markers.has(id)) {
+              markersLayer.removeLayer(markers.get(id));
+              markers.delete(id);
+              plants.delete(id);
+            }
+            if (change.type === "removed") return;
+
+            // Skip broken documents
+            if (typeof p.lat !== "number" || typeof p.lng !== "number") return;
+
+            const marker = L.marker([p.lat, p.lng], { icon: plantIcon, title: p.name })
+              .bindPopup(popupHtml(id, p));
+            markersLayer.addLayer(marker);
+            markers.set(id, marker);
+            plants.set(id, p);
+          });
+          $("statusLine").textContent = `סה"כ ${plants.size} צמחים במאגר`;
+          renderPlantList();
+        },
+        (err) => {
+          console.error(err);
+          $("statusLine").textContent = "שגיאה בטעינת הצמחים: " +
+            (err.code === "permission-denied" ? "אין הרשאת קריאה (בדקו את חוקי Firestore)" : err.message);
+        }
+      );
+    }
+
+    /* =====================================================================
+       5. SIDE PANEL - list of plants visible on the map
+       ===================================================================== */
+
+    function renderPlantList() {
+      const list = $("plantList");
+      const filter = $("listFilter").value.trim().toLowerCase();
+      const bounds = map.getBounds();
+
+      // Keep plants that are inside the visible map area AND match the filter
+      const visible = [...plants.entries()]
+        .filter(([, p]) => bounds.contains([p.lat, p.lng]))
+        .filter(([, p]) => {
+          if (!filter) return true;
+          const text = `${p.name} ${p.scientificName} ${p.ediblePart} ${p.notes}`.toLowerCase();
+          return text.includes(filter);
+        })
+        .sort((a, b) => a[1].name.localeCompare(b[1].name, "he"));
+
+      $("visibleCount").textContent = visible.length;
+
+      if (visible.length === 0) {
+        list.innerHTML = '<li class="empty">אין צמחים באזור הזה. הזיזו את המפה או הוסיפו צמח!</li>';
+        return;
+      }
+
+      list.innerHTML = "";
+      visible.forEach(([id, p]) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>🌿 ${escapeHtml(p.name)}</strong>
+          <small>${escapeHtml(p.ediblePart || p.scientificName || "")}</small>`;
+        li.addEventListener("click", () => {
+          map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16));
+          markers.get(id)?.openPopup();
+          if (window.innerWidth <= 700) $("sidePanel").classList.remove("open");
+        });
+        list.appendChild(li);
+      });
+    }
+
+    map.on("moveend", renderPlantList);
+    $("listFilter").addEventListener("input", renderPlantList);
+    $("panelToggle").addEventListener("click", () => $("sidePanel").classList.toggle("open"));
+    renderPlantList();
+
+    /* =====================================================================
+       6. "ADD PLANT" MODE + FORM
+       ===================================================================== */
+
+    let addingMode = false;
+    let newPlantLatLng = null;   // where the user clicked
+    let tempMarker = null;       // temporary marker while filling the form
+    let selectedTrefle = { slug: "", scientificName: "" };
+
+    function setAddingMode(on) {
+      addingMode = on;
+      $("addBtn").classList.toggle("active", on);
+      $("addBtn").textContent = on ? "✖ ביטול הוספה" : "➕ הוספת צמח";
+      $("addHint").classList.toggle("show", on);
+      $("map").classList.toggle("adding", on);
+    }
+
+    $("addBtn").addEventListener("click", () => setAddingMode(!addingMode));
+
+    // When in adding mode, a click on the map opens the form
+    map.on("click", (e) => {
+      if (!addingMode) return;
+      setAddingMode(false);
+      openAddForm(e.latlng);
+    });
+
+    function openAddForm(latlng) {
+      newPlantLatLng = latlng;
+      selectedTrefle = { slug: "", scientificName: "" };
+      $("addForm").reset();
+      $("formError").textContent = "";
+      $("nameSuggestions").innerHTML = "";
+      $("locationText").value = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+
+      if (tempMarker) tempMarker.remove();
+      tempMarker = L.marker(latlng, { icon: plantIcon, opacity: 0.6 }).addTo(map);
+
+      openModal("addModal");
+      setTimeout(() => $("plantName").focus(), 50);
+    }
+
+    // Remove the temporary marker whenever the form closes
+    new MutationObserver(() => {
+      if (!$("addModal").classList.contains("show") && tempMarker) {
+        tempMarker.remove();
+        tempMarker = null;
+      }
+    }).observe($("addModal"), { attributes: true, attributeFilter: ["class"] });
+
+    /* ---------- Autocomplete for the plant name ---------- */
+    const nameInput = $("plantName");
+    const nameSuggestions = $("nameSuggestions");
+    let suggestCounter = 0;
+
+    async function runNameSuggest() {
+      const query = nameInput.value.trim();
+      if (query.length < 2) { nameSuggestions.innerHTML = ""; return; }
+
+      const myTurn = ++suggestCounter;
+      renderListMessage(nameSuggestions, "מחפש...");
+      try {
+        const results = await searchPlants(query);
+        if (myTurn !== suggestCounter) return;
+        if (results.length === 0) {
+          renderListMessage(nameSuggestions, "לא נמצא במאגר - אפשר לשמור עם השם שהקלדתם");
+          return;
+        }
+        renderResults(nameSuggestions, results, pickSuggestion);
+      } catch (err) {
+        if (myTurn === suggestCounter) {
+          renderListMessage(nameSuggestions, err.message + " - אפשר לשמור גם בלי", true);
+        }
+      }
+    }
+
+    // The user picked a plant from the suggestions
+    async function pickSuggestion(plant) {
+      nameSuggestions.innerHTML = "";
+      nameInput.value = (plant.common_name || plant.scientific_name || "").slice(0, LIMITS.name);
+      selectedTrefle = { slug: plant.slug || "", scientificName: plant.scientific_name || "" };
+      $("scientificName").value = selectedTrefle.scientificName;
+
+      // Fetch the details to fill in the edible part
+      $("ediblePart").placeholder = "טוען...";
+      try {
+        const species = await getSpecies(plant.slug);
+        const part = ediblePartText(species);
+        if (part) $("ediblePart").value = part.slice(0, LIMITS.ediblePart);
+      } catch {
+        // Not critical - the user can type it manually
+      }
+      $("ediblePart").placeholder = "למשל: פירות, עלים";
+    }
+
+    nameInput.addEventListener("input", () => {
+      // Typing again means the previous Trefle selection is no longer valid
+      selectedTrefle = { slug: "", scientificName: "" };
+      $("scientificName").value = "";
+    });
+    nameInput.addEventListener("input", debounce(runNameSuggest, 500));
+
+    /* ---------- Validation (same rules as in Firestore) ---------- */
+    function validatePlant(data) {
+      if (!data.name) return "יש להזין שם צמח";
+      for (const [field, max] of Object.entries(LIMITS)) {
+        if (typeof data[field] !== "string") return "שדה לא תקין: " + field;
+        if (data[field].length > max) return `השדה ארוך מדי (מקסימום ${max} תווים)`;
+      }
+      if (typeof data.lat !== "number" || !isFinite(data.lat) || data.lat < -90 || data.lat > 90) {
+        return "קו רוחב לא תקין";
+      }
+      if (typeof data.lng !== "number" || !isFinite(data.lng) || data.lng < -180 || data.lng > 180) {
+        return "קו אורך לא תקין";
+      }
+      return null; // null = everything is OK
+    }
+
+    /* ---------- Saving to Firestore ---------- */
+    $("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); // don't reload the page
+      if (!db) return;
+
+      const data = {
+        name: nameInput.value.trim(),
+        scientificName: selectedTrefle.scientificName,
+        trefleSlug: selectedTrefle.slug,
+        ediblePart: $("ediblePart").value.trim(),
+        notes: $("notes").value.trim(),
+        lat: Number(newPlantLatLng?.lat),
+        lng: Number(newPlantLatLng?.lng)
+      };
+
+      const error = validatePlant(data);
+      if (error) {
+        $("formError").textContent = error;
+        return;
+      }
+
+      $("saveBtn").disabled = true;
+      $("formError").textContent = "";
+      try {
+        await addDoc(collection(db, "plants"), { ...data, createdAt: serverTimestamp() });
+        closeModal("addModal");
+        showToast("הצמח נשמר! תודה 🌱");
+      } catch (err) {
+        console.error(err);
+        $("formError").textContent = err.code === "permission-denied"
+          ? "השמירה נחסמה על ידי חוקי האבטחה של Firestore"
+          : "השמירה נכשלה: " + err.message;
+      } finally {
+        $("saveBtn").disabled = false;
+      }
+    });
+  </script>
+
+  <!--
+  =====================================================================
+  FIRESTORE SECURITY RULES
+  Copy everything between the lines into:
+  Firebase console -> Firestore Database -> Rules -> Publish
+  Anyone can READ and CREATE plants (with validation), nobody can UPDATE or DELETE.
+  =====================================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Checks that a new plant document looks exactly like the app sends it
+    function isValidPlant(d) {
+      let fields = ['name', 'scientificName', 'trefleSlug', 'ediblePart',
+                    'notes', 'lat', 'lng', 'createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.name is string && d.name.trim().size() > 0 && d.name.size() <= 100
+        && d.scientificName is string && d.scientificName.size() <= 150
+        && d.trefleSlug is string && d.trefleSlug.size() <= 150
+        && d.ediblePart is string && d.ediblePart.size() <= 200
+        && d.notes is string && d.notes.size() <= 500
+        && d.lat is number && d.lat >= -90 && d.lat <= 90
+        && d.lng is number && d.lng >= -180 && d.lng <= 180
+        && d.createdAt == request.time;
+    }
+
+    match /plants/{plantId} {
+      allow read: if true;
+      allow create: if isValidPlant(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Everything else in the database is closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+  =====================================================================
+  -->
+</body>
+</html>
