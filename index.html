@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>מפת צמחי מאכל</title>
-  <meta name="description" content="מפה שיתופית של מיקומי צמחי מאכל" />
+  <meta name="description" content="מפה שיתופית של מיקומי צמחי מאכל / A shared map of edible plants" />
 
   <!-- Leaflet (map library) - CSS and JS from the unpkg CDN -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Hebrew-friendly font from Google Fonts -->
+  <!-- Font that supports Hebrew and English (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" />
 
@@ -55,12 +55,12 @@
     }
 
     /* =========================================================
-       2. HEADER (title, search, buttons)
+       2. HEADER (title, search, buttons, login, language)
        ========================================================= */
     .topbar {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       padding: 10px 16px;
       background: var(--green-dark);
       color: #fff;
@@ -89,7 +89,6 @@
       border-radius: 999px;
       font-size: 1rem;
       font-family: inherit;
-      direction: rtl;
     }
 
     .btn {
@@ -105,7 +104,13 @@
     .btn:hover { filter: brightness(1.08); }
     .btn.active { background: #f9a825; color: #222; }
     .btn.secondary { background: #e0e0e0; color: var(--text); }
+    .btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.6); }
+    .btn.danger { background: var(--danger); }
+    .btn.small { padding: 6px 12px; font-size: 0.85rem; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Login area in the header */
+    .auth-area { display: flex; gap: 6px; align-items: center; }
 
     /* Only shown on small screens (see media query below) */
     #panelToggle { display: none; }
@@ -123,7 +128,7 @@
       color: var(--text);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      max-height: 320px;
+      max-height: 360px;
       overflow-y: auto;
       z-index: 2100;
     }
@@ -140,6 +145,13 @@
     .results-list li:hover { background: var(--green-pale); }
     .results-list li.message { cursor: default; color: var(--muted); }
     .results-list li.message.error { color: var(--danger); }
+    .results-list li.section {
+      cursor: default;
+      background: #f6f8f6;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 4px 12px;
+    }
     .results-list img, .results-list .no-img {
       width: 40px;
       height: 40px;
@@ -151,7 +163,9 @@
       align-items: center;
       justify-content: center;
     }
+    .results-list .result-text { flex: 1; min-width: 0; }
     .results-list small { color: var(--muted); display: block; font-style: italic; }
+    .results-list .edible-mark { flex-shrink: 0; font-size: 0.8rem; color: var(--green); font-weight: 700; }
 
     /* =========================================================
        3. SAFETY DISCLAIMER
@@ -183,17 +197,17 @@
     /* While in "add plant" mode the cursor becomes a crosshair */
     #map.adding { cursor: crosshair; }
 
-    /* Popups are inside the LTR map, so we switch them back to RTL */
+    /* Popups are inside the LTR map, so in Hebrew we switch them back to RTL */
     .leaflet-popup-content {
-      direction: rtl;
-      text-align: right;
       font-family: "Rubik", system-ui, sans-serif;
       font-size: 0.92rem;
-      min-width: 180px;
+      min-width: 190px;
     }
+    html[dir="rtl"] .leaflet-popup-content { direction: rtl; text-align: right; }
     .leaflet-popup-content h3 { margin: 0 0 4px; color: var(--green-dark); }
     .leaflet-popup-content p { margin: 4px 0; }
     .leaflet-popup-content .sci { font-style: italic; color: var(--muted); }
+    .popup-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 
     /* Custom leaf marker */
     .plant-marker {
@@ -236,7 +250,7 @@
     }
     .add-hint.show { display: block; }
 
-    /* Side panel with the list of visible plants (on the right, because RTL) */
+    /* Side panel with the list of visible plants */
     .side-panel {
       position: absolute;
       top: 12px;
@@ -278,7 +292,7 @@
     }
     #plantList li:hover { background: var(--green-pale); }
     #plantList li strong { display: block; }
-    #plantList li small { color: var(--muted); }
+    #plantList li small { color: var(--muted); display: block; }
     #plantList li.empty { cursor: default; color: var(--muted); text-align: center; }
     .status-line {
       padding: 6px 12px;
@@ -288,7 +302,7 @@
     }
 
     /* =========================================================
-       5. MODALS (plant info + add-plant form)
+       5. MODALS (plant info, add-plant form, nickname)
        ========================================================= */
     .modal-backdrop {
       position: fixed;
@@ -307,17 +321,17 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       width: 100%;
-      max-width: 460px;
+      max-width: 480px;
       max-height: 90vh;
       overflow-y: auto;
       padding: 20px;
       position: relative;
     }
-    .modal h2 { margin-top: 0; color: var(--green-dark); }
+    .modal h2 { margin-top: 0; color: var(--green-dark); padding-inline-end: 28px; }
     .close-btn {
       position: absolute;
       top: 10px;
-      left: 10px; /* left = "end" side in RTL */
+      inset-inline-end: 10px; /* the "end" side: left in Hebrew, right in English */
       background: none;
       border: none;
       font-size: 1.5rem;
@@ -329,16 +343,19 @@
       max-height: 240px;
       object-fit: cover;
       border-radius: var(--radius);
-      margin-bottom: 10px;
     }
+    .photo-credit { font-size: 0.72rem; color: var(--muted); margin: 2px 0 10px; direction: ltr; text-align: left; }
     .info-table { width: 100%; border-collapse: collapse; }
     .info-table th, .info-table td {
-      text-align: right;
+      text-align: start;
       padding: 6px 4px;
       border-bottom: 1px solid #eee;
       vertical-align: top;
     }
-    .info-table th { color: var(--muted); font-weight: 500; width: 40%; }
+    .info-table th { color: var(--muted); font-weight: 500; width: 35%; }
+    .wiki-text { line-height: 1.55; margin: 12px 0 4px; }
+    .info-links { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.9rem; margin-top: 6px; }
+    .info-links a { color: var(--green); }
 
     .badge {
       display: inline-block;
@@ -348,8 +365,9 @@
       font-size: 0.9rem;
       margin-bottom: 10px;
     }
+    .badge.small { padding: 2px 8px; font-size: 0.78rem; margin: 2px 0; }
     .badge.edible { background: var(--green-pale); color: var(--green); border: 1px solid var(--green-light); }
-    .badge.not-edible { background: #f5f5f5; color: #616161; border: 1px solid #bdbdbd; }
+    .badge.unknown { background: #f5f5f5; color: #616161; border: 1px solid #bdbdbd; }
 
     .small-warning {
       background: var(--warning-bg);
@@ -359,6 +377,7 @@
       font-size: 0.85rem;
       margin-top: 12px;
     }
+    .note { font-size: 0.85rem; color: var(--muted); }
 
     /* Form fields */
     .form-row { margin-bottom: 12px; position: relative; }
@@ -424,46 +443,51 @@
 </head>
 
 <body>
+  <!-- All visible texts have a data-i18n="key" attribute.
+       JavaScript fills them from the TEXTS dictionary in the chosen language. -->
+
   <!-- ================= HEADER ================= -->
   <header class="topbar">
-    <h1 class="logo">🌿 מפת צמחי מאכל</h1>
+    <h1 class="logo" data-i18n="logo">🌿 מפת צמחי מאכל</h1>
 
-    <!-- Plant search (Trefle) -->
+    <!-- Plant search (built-in list + iNaturalist) -->
     <div class="search-wrap">
-      <input id="searchInput" type="search" autocomplete="off"
-             placeholder="חיפוש צמח באנגלית או בשם מדעי (למשל: fig, Ficus carica)" />
+      <input id="searchInput" type="search" autocomplete="off" data-i18n-ph="searchPlaceholder" />
       <ul id="searchResults" class="results-list"></ul>
     </div>
 
-    <button id="addBtn" class="btn">➕ הוספת צמח</button>
-    <button id="panelToggle" class="btn secondary">📋 רשימה</button>
+    <button id="addBtn" class="btn"></button>
+    <button id="panelToggle" class="btn secondary" data-i18n="panelToggle"></button>
+
+    <!-- Login / user area (filled by JavaScript) -->
+    <div id="authArea" class="auth-area"></div>
+
+    <!-- Language switch -->
+    <button id="langBtn" class="btn ghost small" data-i18n="langSwitch"></button>
   </header>
 
   <!-- ================= SAFETY DISCLAIMER ================= -->
-  <div class="disclaimer" role="note">
-    ⚠️ <strong>אזהרת בטיחות:</strong> לעולם אל תאכלו צמח בר אלא אם אתם בטוחים ב-100% בזיהוי שלו.
-    המידע באתר נועד למטרות לימוד בלבד.
-  </div>
+  <div class="disclaimer" role="note" data-i18n-html="disclaimer"></div>
 
   <!-- ================= MAP + SIDE PANEL ================= -->
   <main class="main">
     <div id="map"></div>
-    <div id="addHint" class="add-hint">לחצו על המפה כדי לבחור את מיקום הצמח</div>
+    <div id="addHint" class="add-hint" data-i18n="addHint"></div>
 
     <aside id="sidePanel" class="side-panel">
       <header>
-        <h2>צמחים באזור המוצג (<span id="visibleCount">0</span>)</h2>
-        <input id="listFilter" type="search" placeholder="סינון לפי שם או הערה..." />
+        <h2><span data-i18n="panelTitle"></span> (<span id="visibleCount">0</span>)</h2>
+        <input id="listFilter" type="search" data-i18n-ph="listFilter" />
       </header>
       <ul id="plantList"></ul>
-      <div id="statusLine" class="status-line">טוען...</div>
+      <div id="statusLine" class="status-line"></div>
     </aside>
   </main>
 
-  <!-- ================= MODAL: PLANT INFO (Trefle) ================= -->
+  <!-- ================= MODAL: PLANT INFO ================= -->
   <div id="infoModal" class="modal-backdrop">
     <div class="modal" role="dialog" aria-modal="true">
-      <button class="close-btn" data-close="infoModal" aria-label="סגירה">×</button>
+      <button class="close-btn" data-close="infoModal" aria-label="close">×</button>
       <div id="infoContent"></div>
     </div>
   </div>
@@ -471,43 +495,64 @@
   <!-- ================= MODAL: ADD PLANT FORM ================= -->
   <div id="addModal" class="modal-backdrop">
     <div class="modal" role="dialog" aria-modal="true">
-      <button class="close-btn" data-close="addModal" aria-label="סגירה">×</button>
-      <h2>הוספת צמח למפה</h2>
+      <button class="close-btn" data-close="addModal" aria-label="close">×</button>
+      <h2 data-i18n="addTitle"></h2>
 
       <form id="addForm" novalidate>
         <div class="form-row">
-          <label for="plantName">שם הצמח *</label>
-          <input id="plantName" type="text" maxlength="100" autocomplete="off"
-                 placeholder="הקלידו שם באנגלית לחיפוש, או כל שם חופשי" />
+          <label for="plantName" data-i18n="plantNameLabel"></label>
+          <input id="plantName" type="text" maxlength="100" autocomplete="off" data-i18n-ph="plantNamePh" />
           <ul id="nameSuggestions" class="results-list"></ul>
-          <div class="hint">בחירה מהרשימה תמלא אוטומטית את השם המדעי והחלק האכיל.</div>
+          <div class="hint" data-i18n="plantNameHint"></div>
         </div>
 
+        <div id="pickedInfo"></div>
+
         <div class="form-row">
-          <label for="scientificName">שם מדעי</label>
+          <label for="scientificName" data-i18n="sciLabel"></label>
           <input id="scientificName" type="text" maxlength="150" readonly />
         </div>
 
         <div class="form-row">
-          <label for="ediblePart">חלק אכיל</label>
-          <input id="ediblePart" type="text" maxlength="200" placeholder="למשל: פירות, עלים" />
+          <label for="ediblePart" data-i18n="ediblePartLabel"></label>
+          <input id="ediblePart" type="text" maxlength="200" data-i18n-ph="ediblePartPh" />
         </div>
 
         <div class="form-row">
-          <label for="notes">הערות</label>
-          <textarea id="notes" maxlength="500" placeholder="למשל: עץ ליד הספסל, מניב בקיץ"></textarea>
+          <label for="notes" data-i18n="notesLabel"></label>
+          <textarea id="notes" maxlength="500" data-i18n-ph="notesPh"></textarea>
         </div>
 
         <div class="form-row">
-          <label>מיקום</label>
+          <label data-i18n="locationLabel"></label>
           <input id="locationText" type="text" readonly />
         </div>
 
         <p id="formError" class="form-error"></p>
 
         <div class="form-actions">
-          <button type="submit" id="saveBtn" class="btn">💾 שמירה</button>
-          <button type="button" class="btn secondary" data-close="addModal">ביטול</button>
+          <button type="submit" id="saveBtn" class="btn" data-i18n="save"></button>
+          <button type="button" class="btn secondary" data-close="addModal" data-i18n="cancel"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: NICKNAME ================= -->
+  <div id="nickModal" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="close-btn" data-close="nickModal" aria-label="close">×</button>
+      <h2 data-i18n="nickTitle"></h2>
+      <p class="note" data-i18n="nickNote"></p>
+      <form id="nickForm" novalidate>
+        <div class="form-row">
+          <label for="nickInput" data-i18n="nickLabel"></label>
+          <input id="nickInput" type="text" maxlength="30" autocomplete="nickname" />
+        </div>
+        <p id="nickError" class="form-error"></p>
+        <div class="form-actions">
+          <button type="submit" id="nickSaveBtn" class="btn" data-i18n="save"></button>
+          <button type="button" class="btn secondary" data-close="nickModal" data-i18n="later"></button>
         </div>
       </form>
     </div>
@@ -523,24 +568,19 @@
     // Firebase modular SDK (v10) from Google's CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, onSnapshot, serverTimestamp
+      getFirestore, collection, addDoc, deleteDoc, doc, getDoc, onSnapshot,
+      serverTimestamp, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
     /* =====================================================================
-       0. SETTINGS - paste your keys here
+       0. SETTINGS
        ===================================================================== */
 
-    // Trefle API token (https://trefle.io -> Account -> Access token).
-    // NOTE: anything in this file is public once it's on GitHub Pages,
-    // so anyone can see this token. That's OK for a free study project.
-    const TREFLE_TOKEN = "usr-SexKBwhaN920LOfA36I3iWJ3d4j0TqGvEdGNcirBaQM";
-
-    // About CORS: Trefle answers with "Access-Control-Allow-Origin: *",
-    // so it can be called directly from the browser. (Checked: it works.)
-    // That's why there is no need for the Perenual fallback.
-    const TREFLE_BASE = "https://trefle.io/api/v1";
-
     // Firebase config: Firebase console -> Project settings -> "Your apps" -> Web app -> Config
+    // (This is NOT a secret - security comes from the Firestore rules at the bottom of the file.)
     const firebaseConfig = {
       apiKey: "AIzaSyDSDkGBuFxCUuFW4tKmIf1tQTBgSJyt3IU",
       authDomain: "eatyourcity-d6421.firebaseapp.com",
@@ -551,11 +591,384 @@
       measurementId: "G-JRJV2DVL5R"
     };
 
+    // The admin's Firebase user ID (can delete any plant).
+    // Found in: Firebase console -> Authentication -> Users -> "User UID".
+    // The same value is in the Firestore rules at the bottom of this file.
+    const ADMIN_UID = "j9uBRpG3HuXV7JZ1rz5yuEem8Xj2";
+
+    // Plant information comes from iNaturalist (free, no key, supports Hebrew names)
+    const INAT_BASE = "https://api.inaturalist.org/v1";
+    const INAT_PLANTS_ID = 47126; // iNaturalist's ID for the plant kingdom (filters out animals)
+
     // Maximum text lengths (the same numbers are used in the Firestore rules)
-    const LIMITS = { name: 100, scientificName: 150, trefleSlug: 150, ediblePart: 200, notes: 500 };
+    const LIMITS = { name: 100, scientificName: 150, ediblePart: 200, notes: 500, addedByName: 30 };
 
     /* =====================================================================
-       1. SMALL HELPER FUNCTIONS
+       1. LANGUAGE (Hebrew / English)
+       Every text on the page is here, in both languages.
+       {name} in a text is replaced with a value, e.g. t("addedBy", {name: "Dana"}).
+       ===================================================================== */
+    const TEXTS = {
+      he: {
+        pageTitle: "מפת צמחי מאכל",
+        logo: "🌿 מפת צמחי מאכל",
+        langSwitch: "English",
+        searchPlaceholder: "חיפוש צמח בעברית, באנגלית או בשם מדעי (למשל: תות, rosemary)",
+        addPlant: "➕ הוספת צמח",
+        cancelAdd: "✖ ביטול הוספה",
+        panelToggle: "📋 רשימה",
+        disclaimer: "⚠️ <strong>אזהרת בטיחות:</strong> לעולם אל תאכלו צמח בר אלא אם אתם בטוחים ב-100% בזיהוי שלו. המידע באתר נועד למטרות לימוד בלבד. חלק מצמחי הבר בישראל מוגנים - אין לקטוף אותם בטבע.",
+        addHint: "לחצו על המפה כדי לבחור את מיקום הצמח",
+        panelTitle: "צמחים באזור המוצג",
+        listFilter: "סינון לפי שם, הערה או מוסיף...",
+        listEmpty: "אין צמחים באזור הזה. הזיזו את המפה או הוסיפו צמח!",
+        loading: "טוען...",
+        totalPlants: "סה\"כ {n} צמחים במאגר",
+        loadError: "שגיאה בטעינת הצמחים: {msg}",
+        readDenied: "אין הרשאת קריאה (בדקו את חוקי Firestore)",
+        firebaseError: "שגיאה בחיבור ל-Firebase - בדקו את ההגדרות",
+
+        // Add form
+        addTitle: "הוספת צמח למפה",
+        plantNameLabel: "שם הצמח *",
+        plantNamePh: "הקלידו שם בעברית או באנגלית",
+        plantNameHint: "בחירה מהרשימה תמלא אוטומטית את השם המדעי והחלק האכיל. ✅ = ברשימת הצמחים האכילים שלנו.",
+        sciLabel: "שם מדעי",
+        ediblePartLabel: "חלק אכיל",
+        ediblePartPh: "למשל: פירות, עלים",
+        notesLabel: "הערות",
+        notesPh: "למשל: עץ ליד הספסל, מניב בקיץ",
+        locationLabel: "מיקום",
+        save: "💾 שמירה",
+        cancel: "ביטול",
+        later: "אחר כך",
+        nameRequired: "יש להזין שם צמח",
+        fieldInvalid: "שדה לא תקין: {field}",
+        tooLong: "השדה ארוך מדי (מקסימום {max} תווים)",
+        badTaxon: "מזהה צמח לא תקין",
+        badLat: "קו רוחב לא תקין",
+        badLng: "קו אורך לא תקין",
+        needLogin: "צריך להתחבר כדי להוסיף צמח",
+        needNickname: "צריך לבחור כינוי לפני שמוסיפים צמח",
+        saved: "הצמח נשמר! תודה 🌱",
+        saveBlocked: "השמירה נחסמה על ידי חוקי האבטחה של Firestore",
+        saveFailed: "השמירה נכשלה: {msg}",
+
+        // Login & nickname
+        login: "🔑 התחברות",
+        logout: "יציאה",
+        chooseNick: "👤 בחירת כינוי",
+        changeNick: "שינוי כינוי",
+        nickTitle: "איך לקרוא לך?",
+        nickNote: "הכינוי יופיע ליד כל צמח שתוסיפו (\"נוסף ע״י...\") וגלוי לכל מי שנכנס לאתר. כל כינוי ייחודי - אין שני משתמשים עם אותו כינוי. מומלץ לא להשתמש בשם המלא.",
+        nickLabel: "כינוי (2-30 תווים: אותיות, מספרים, רווח, _ - . ')",
+        nickInvalid: "כינוי לא תקין: 2-30 תווים, אותיות/מספרים, רווח ו- _ - . ' בלבד",
+        nickTaken: "הכינוי \"{name}\" כבר תפוס - נסו כינוי אחר",
+        nickSaved: "הכינוי נשמר: {name}",
+        nickFailed: "שמירת הכינוי נכשלה: {msg}",
+        popupBlocked: "הדפדפן חסם את חלון ההתחברות - אפשרו חלונות קופצים לאתר",
+        unauthorizedDomain: "הכתובת הזו לא מאושרת ב-Firebase (Authentication → Settings → Authorized domains)",
+        notEnabled: "התחברות עם Google לא הופעלה ב-Firebase",
+        loginFailed: "ההתחברות נכשלה: {msg}",
+
+        // Popups & delete
+        ediblePartShort: "חלק אכיל:",
+        notesShort: "הערות:",
+        addedBy: "נוסף ע״י {name}",
+        unknownUser: "לא ידוע",
+        moreInfo: "ℹ️ מידע נוסף",
+        delete: "🗑️ מחיקה",
+        confirmDelete: "למחוק את \"{name}\" מהמפה? אי אפשר לבטל את הפעולה.",
+        deleted: "הצמח נמחק",
+        noDeletePerm: "אין לך הרשאה למחוק את הצמח הזה",
+        deleteFailed: "המחיקה נכשלה: {msg}",
+
+        // Edibility & info window
+        edible: "✅ אכיל",
+        unknownEdible: "❔ אין לנו מידע על אכילות",
+        notInList: "הצמח לא נמצא ברשימת הצמחים האכילים שלנו. זה <strong>לא</strong> אומר שהוא רעיל - וגם לא שהוא בטוח לאכילה.",
+        hebrewName: "שם עברי",
+        englishName: "שם באנגלית",
+        sciName: "שם מדעי",
+        family: "משפחה",
+        edibleParts: "חלקים אכילים",
+        season: "עונה",
+        wikiLink: "📖 לערך בוויקיפדיה",
+        safety: "⚠️ אל תאכלו צמח בר בלי זיהוי ודאי של 100%. המידע כאן ללימוד בלבד.",
+        plant: "צמח",
+
+        // Search
+        listSection: "מהרשימה שלנו (צמחים אכילים)",
+        inatSection: "צמחים נוספים (iNaturalist)",
+        searching: "מחפש...",
+        noResults: "לא נמצאו תוצאות. נסו שם אחר.",
+        allSpecies: "(כל המינים בסוג)",
+        genus: "(סוג)",
+        networkError: "אין חיבור לשירות המידע על צמחים (בעיית רשת)",
+        tooManyRequests: "יותר מדי בקשות - נסו שוב בעוד דקה",
+        serverError: "שגיאה בשירות המידע על צמחים ({code})",
+
+        // Map
+        streets: "מפת רחובות",
+        satellite: "לוויין",
+        myLocation: "המיקום שלי",
+        noGeo: "הדפדפן שלך לא תומך באיתור מיקום",
+        locating: "מאתר מיקום...",
+        located: "נמצא המיקום שלך",
+        youAreHere: "אתם כאן",
+        geoDenied: "לא ניתנה הרשאה לגשת למיקום",
+        geoUnavailable: "לא ניתן לקבוע את המיקום כרגע",
+        geoTimeout: "איתור המיקום לקח יותר מדי זמן",
+        geoError: "שגיאה באיתור המיקום"
+      },
+
+      en: {
+        pageTitle: "Edible Plants Map",
+        logo: "🌿 Edible Plants Map",
+        langSwitch: "עברית",
+        searchPlaceholder: "Search a plant in English, Hebrew or Latin (e.g. mulberry, rosemary)",
+        addPlant: "➕ Add plant",
+        cancelAdd: "✖ Cancel",
+        panelToggle: "📋 List",
+        disclaimer: "⚠️ <strong>Safety warning:</strong> never eat a wild plant unless you are 100% sure of its identification. This information is for education only. Some wild plants in Israel are protected - do not pick them in nature.",
+        addHint: "Click on the map to choose the plant's location",
+        panelTitle: "Plants in view",
+        listFilter: "Filter by name, note or contributor...",
+        listEmpty: "No plants in this area. Move the map or add a plant!",
+        loading: "Loading...",
+        totalPlants: "{n} plants in total",
+        loadError: "Error loading plants: {msg}",
+        readDenied: "no read permission (check the Firestore rules)",
+        firebaseError: "Could not connect to Firebase - check the settings",
+
+        addTitle: "Add a plant to the map",
+        plantNameLabel: "Plant name *",
+        plantNamePh: "Type a name in English or Hebrew",
+        plantNameHint: "Picking from the list fills in the scientific name and edible part. ✅ = on our edible plants list.",
+        sciLabel: "Scientific name",
+        ediblePartLabel: "Edible part",
+        ediblePartPh: "e.g. fruit, leaves",
+        notesLabel: "Notes",
+        notesPh: "e.g. tree next to the bench, fruits in summer",
+        locationLabel: "Location",
+        save: "💾 Save",
+        cancel: "Cancel",
+        later: "Later",
+        nameRequired: "Please enter a plant name",
+        fieldInvalid: "Invalid field: {field}",
+        tooLong: "Text is too long (max {max} characters)",
+        badTaxon: "Invalid plant ID",
+        badLat: "Invalid latitude",
+        badLng: "Invalid longitude",
+        needLogin: "Please log in to add a plant",
+        needNickname: "Please choose a nickname before adding a plant",
+        saved: "Plant saved! Thank you 🌱",
+        saveBlocked: "Saving was blocked by the Firestore security rules",
+        saveFailed: "Saving failed: {msg}",
+
+        login: "🔑 Log in",
+        logout: "Log out",
+        chooseNick: "👤 Choose nickname",
+        changeNick: "Change nickname",
+        nickTitle: "What should we call you?",
+        nickNote: "Your nickname is shown next to every plant you add (\"added by...\") and is visible to everyone. Each nickname is unique - no two users can have the same one. Better not to use your full name.",
+        nickLabel: "Nickname (2-30 characters: letters, numbers, space, _ - . ')",
+        nickInvalid: "Invalid nickname: 2-30 characters, letters/numbers, space and _ - . ' only",
+        nickTaken: "The nickname \"{name}\" is already taken - try another one",
+        nickSaved: "Nickname saved: {name}",
+        nickFailed: "Saving the nickname failed: {msg}",
+        popupBlocked: "The browser blocked the login window - allow pop-ups for this site",
+        unauthorizedDomain: "This address is not authorized in Firebase (Authentication → Settings → Authorized domains)",
+        notEnabled: "Google login is not enabled in Firebase",
+        loginFailed: "Login failed: {msg}",
+
+        ediblePartShort: "Edible part:",
+        notesShort: "Notes:",
+        addedBy: "Added by {name}",
+        unknownUser: "unknown",
+        moreInfo: "ℹ️ More info",
+        delete: "🗑️ Delete",
+        confirmDelete: "Delete \"{name}\" from the map? This cannot be undone.",
+        deleted: "Plant deleted",
+        noDeletePerm: "You are not allowed to delete this plant",
+        deleteFailed: "Delete failed: {msg}",
+
+        edible: "✅ Edible",
+        unknownEdible: "❔ No edibility info",
+        notInList: "This plant is not on our edible plants list. That does <strong>not</strong> mean it is poisonous - or that it is safe to eat.",
+        hebrewName: "Hebrew name",
+        englishName: "English name",
+        sciName: "Scientific name",
+        family: "Family",
+        edibleParts: "Edible parts",
+        season: "Season",
+        wikiLink: "📖 Wikipedia article",
+        safety: "⚠️ Never eat a wild plant without 100% certain identification. For education only.",
+        plant: "Plant",
+
+        listSection: "From our list (edible plants)",
+        inatSection: "More plants (iNaturalist)",
+        searching: "Searching...",
+        noResults: "No results. Try another name.",
+        allSpecies: "(all species in the genus)",
+        genus: "(genus)",
+        networkError: "Cannot reach the plant information service (network problem)",
+        tooManyRequests: "Too many requests - try again in a minute",
+        serverError: "Plant information service error ({code})",
+
+        streets: "Streets",
+        satellite: "Satellite",
+        myLocation: "My location",
+        noGeo: "Your browser does not support location",
+        locating: "Finding your location...",
+        located: "Found your location",
+        youAreHere: "You are here",
+        geoDenied: "Location permission was denied",
+        geoUnavailable: "Location is not available right now",
+        geoTimeout: "Finding your location took too long",
+        geoError: "Location error"
+      }
+    };
+
+    // The chosen language is remembered in this browser
+    let lang = "he";
+    try { if (localStorage.getItem("lang") === "en") lang = "en"; } catch {}
+
+    // t("key") returns the text in the current language
+    function t(key, vars = {}) {
+      let text = TEXTS[lang][key] ?? TEXTS.he[key] ?? key;
+      for (const [name, value] of Object.entries(vars)) text = text.replaceAll("{" + name + "}", () => String(value));
+      return text;
+    }
+
+    // The status line at the bottom of the side panel (remembered so it can be translated)
+    let status = { key: "loading", vars: {} };
+    function setStatus(key, vars = {}) {
+      status = { key, vars };
+      document.getElementById("statusLine").textContent = t(key, vars);
+    }
+
+    // tr(["עברית", "English"]) picks one side of a pair
+    function tr(pair) {
+      if (!pair) return "";
+      return lang === "en" ? pair[1] : pair[0];
+    }
+
+    /* =====================================================================
+       2. BUILT-IN LIST OF EDIBLE PLANTS
+       This list is the ONLY source for the "edible" badge.
+       - sci:   scientific name. If genus: true, it covers every species in that genus.
+       - alt:   other scientific names for the same plant (old names)
+       - he:    Hebrew names (the first one is shown);  en: English name
+       - parts, season, warning: ["Hebrew", "English"]
+       ===================================================================== */
+    const EDIBLE_PLANTS = [
+      // --- Fruit trees and shrubs ---
+      { sci: "Morus", genus: true, he: ["תות עץ", "תות", "תות לבן", "תות שחור"], en: "Mulberry", parts: ["פירות בשלים, עלים צעירים (מבושלים)", "ripe fruit, young leaves (cooked)"], season: ["אביב - תחילת קיץ", "spring - early summer"], warning: ["פירות לא בשלים עלולים לגרום לבחילה.", "Unripe fruit may cause nausea."] },
+      { sci: "Ficus carica", he: ["תאנה", "תאנה מצויה"], en: "Fig", parts: ["פירות, עלים (לחליטה ולעטיפה)", "fruit, leaves (tea, wrapping)"], season: ["קיץ - סתיו", "summer - autumn"], warning: ["השרף הלבן עלול לגרות את העור.", "The white sap can irritate the skin."] },
+      { sci: "Ficus sycomorus", he: ["שקמה", "פיקוס השקמה"], en: "Sycamore fig", parts: ["פירות", "fruit"], season: ["קיץ - סתיו", "summer - autumn"] },
+      { sci: "Olea europaea", he: ["זית", "זית אירופי"], en: "Olive", parts: ["פירות (רק אחרי כבישה), שמן", "fruit (only after curing), oil"], season: ["סתיו", "autumn"], warning: ["פירות טריים מרים מאוד - יש לכבוש לפני אכילה.", "Fresh olives are very bitter - cure before eating."] },
+      { sci: "Opuntia", genus: true, he: ["צבר", "סברס", "פרקלי", "צבר מצוי"], en: "Prickly pear", parts: ["פירות, מחבטים צעירים", "fruit, young pads"], season: ["קיץ", "summer"], warning: ["מכוסה בקוצים זעירים - לקטוף עם כפפות ולקלף היטב.", "Covered in tiny spines - use gloves and peel well."] },
+      { sci: "Ceratonia siliqua", he: ["חרוב", "חרוב מצוי"], en: "Carob", parts: ["תרמילים בשלים", "ripe pods"], season: ["סוף קיץ - סתיו", "late summer - autumn"] },
+      { sci: "Punica granatum", he: ["רימון"], en: "Pomegranate", parts: ["פירות (גרגרים)", "fruit (arils)"], season: ["סתיו", "autumn"] },
+      { sci: "Vitis vinifera", he: ["גפן", "גפן היין", "ענבים"], en: "Grape", parts: ["פירות, עלים", "fruit, leaves"], season: ["קיץ", "summer"] },
+      { sci: "Phoenix dactylifera", he: ["תמר", "דקל", "תמר מצוי"], en: "Date palm", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"] },
+      { sci: "Ziziphus", genus: true, he: ["שיזף", "שיזף מצוי", "שיזף תרבותי", "ג'וג'ובה"], en: "Jujube", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"] },
+      { sci: "Eriobotrya japonica", he: ["שסק"], en: "Loquat", parts: ["פירות", "fruit"], season: ["אביב", "spring"], warning: ["הגלעינים רעילים - לא לאכול אותם.", "The seeds are toxic - do not eat them."] },
+      { sci: "Citrus", genus: true, he: ["הדרים", "לימון", "תפוז", "קלמנטינה", "אשכולית", "פומלה", "קומקווט"], en: "Citrus", parts: ["פירות, קליפה", "fruit, peel"], season: ["חורף", "winter"] },
+      { sci: "Prunus dulcis", alt: ["Prunus amygdalus"], he: ["שקד", "שקד מצוי"], en: "Almond", parts: ["זרעים (שקדים מתוקים בלבד)", "seeds (sweet almonds only)"], season: ["קיץ", "summer"], warning: ["שקדים מרים מכילים ציאניד - לא לאכול שקד מר!", "Bitter almonds contain cyanide - never eat a bitter almond!"] },
+      { sci: "Prunus persica", he: ["אפרסק", "נקטרינה"], en: "Peach", parts: ["פירות", "fruit"], season: ["קיץ", "summer"], warning: ["לא לאכול את תוכן הגלעין.", "Do not eat the kernel inside the pit."] },
+      { sci: "Prunus armeniaca", he: ["משמש"], en: "Apricot", parts: ["פירות", "fruit"], season: ["תחילת קיץ", "early summer"], warning: ["לא לאכול את תוכן הגלעין.", "Do not eat the kernel inside the pit."] },
+      { sci: "Prunus domestica", he: ["שזיף"], en: "Plum", parts: ["פירות", "fruit"], season: ["קיץ", "summer"], warning: ["לא לאכול את תוכן הגלעין.", "Do not eat the kernel inside the pit."] },
+      { sci: "Prunus avium", he: ["דובדבן"], en: "Cherry", parts: ["פירות", "fruit"], season: ["תחילת קיץ", "early summer"], warning: ["לא לאכול את תוכן הגלעין.", "Do not eat the kernel inside the pit."] },
+      { sci: "Malus domestica", he: ["תפוח", "תפוח עץ"], en: "Apple", parts: ["פירות", "fruit"], season: ["קיץ - סתיו", "summer - autumn"] },
+      { sci: "Pyrus", genus: true, he: ["אגס", "אגס סורי"], en: "Pear", parts: ["פירות", "fruit"], season: ["קיץ - סתיו", "summer - autumn"] },
+      { sci: "Cydonia oblonga", he: ["חבוש"], en: "Quince", parts: ["פירות (בדרך כלל מבושלים)", "fruit (usually cooked)"], season: ["סתיו", "autumn"] },
+      { sci: "Crataegus", genus: true, he: ["עוזרר", "עוזרר קוצני"], en: "Hawthorn", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"], warning: ["לא לאכול את הזרעים.", "Do not eat the seeds."] },
+      { sci: "Celtis australis", he: ["מיש", "מיש דרומי"], en: "Hackberry", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"] },
+      { sci: "Diospyros kaki", he: ["אפרסמון"], en: "Persimmon", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"] },
+      { sci: "Psidium guajava", he: ["גויאבה"], en: "Guava", parts: ["פירות", "fruit"], season: ["סתיו", "autumn"] },
+      { sci: "Mangifera indica", he: ["מנגו"], en: "Mango", parts: ["פירות", "fruit"], season: ["קיץ", "summer"], warning: ["הקליפה והשרף עלולים לגרום לאלרגיה בעור.", "The peel and sap can cause skin allergy."] },
+      { sci: "Persea americana", he: ["אבוקדו"], en: "Avocado", parts: ["פירות", "fruit"], season: ["חורף", "winter"] },
+      { sci: "Musa", genus: true, he: ["בננה"], en: "Banana", parts: ["פירות", "fruit"], season: ["כל השנה", "all year"] },
+      { sci: "Carica papaya", he: ["פפאיה"], en: "Papaya", parts: ["פירות", "fruit"], season: ["כל השנה", "all year"] },
+      { sci: "Litchi chinensis", he: ["ליצ'י"], en: "Lychee", parts: ["פירות", "fruit"], season: ["קיץ", "summer"], warning: ["לא לאכול פירות לא בשלים, ולא על קיבה ריקה.", "Do not eat unripe fruit, or on an empty stomach."] },
+      { sci: "Annona cherimola", he: ["אנונה", "צ'רימויה"], en: "Cherimoya", parts: ["פירות", "fruit"], season: ["חורף", "winter"], warning: ["הזרעים רעילים.", "The seeds are toxic."] },
+      { sci: "Acca sellowiana", alt: ["Feijoa sellowiana"], he: ["פיג'ויה"], en: "Feijoa", parts: ["פירות, עלי כותרת", "fruit, petals"], season: ["סתיו", "autumn"] },
+      { sci: "Eugenia uniflora", he: ["פיטנגה", "דובדבן סורינם"], en: "Surinam cherry", parts: ["פירות בשלים", "ripe fruit"], season: ["אביב", "spring"] },
+      { sci: "Passiflora edulis", he: ["פסיפלורה", "שעונית"], en: "Passion fruit", parts: ["פירות בשלים", "ripe fruit"], season: ["קיץ - סתיו", "summer - autumn"] },
+      { sci: "Selenicereus undatus", alt: ["Hylocereus undatus"], he: ["פיטאיה", "פרי הדרקון"], en: "Dragon fruit", parts: ["פירות", "fruit"], season: ["קיץ - סתיו", "summer - autumn"] },
+      { sci: "Averrhoa carambola", he: ["קרמבולה"], en: "Star fruit", parts: ["פירות", "fruit"], season: ["חורף", "winter"], warning: ["מסוכן לאנשים עם בעיות כליה.", "Dangerous for people with kidney problems."] },
+      { sci: "Physalis peruviana", he: ["פיזליס", "דלעת הנזיר"], en: "Cape gooseberry", parts: ["פירות בשלים בלבד", "ripe fruit only"], season: ["סתיו", "autumn"], warning: ["פירות לא בשלים ועלים רעילים.", "Unripe fruit and leaves are toxic."] },
+      { sci: "Rubus", genus: true, he: ["פטל", "פטל קדוש"], en: "Blackberry", parts: ["פירות", "fruit"], season: ["קיץ", "summer"] },
+      { sci: "Fragaria", genus: true, he: ["תות שדה"], en: "Strawberry", parts: ["פירות", "fruit"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Myrtus communis", he: ["הדס", "הדס מצוי"], en: "Myrtle", parts: ["פירות, עלים (תבלין)", "fruit, leaves (spice)"], season: ["סתיו - חורף", "autumn - winter"] },
+      { sci: "Sambucus nigra", he: ["סמבוק", "סמבוק שחור"], en: "Elder", parts: ["פרחים, פירות בשלים מבושלים בלבד", "flowers, ripe fruit (cooked only)"], season: ["אביב - קיץ", "spring - summer"], warning: ["עלים, גבעולים ופירות לא בשלים או לא מבושלים רעילים.", "Leaves, stems and unripe or raw fruit are toxic."] },
+      { sci: "Rosa", genus: true, he: ["ורד"], en: "Rose", parts: ["עלי כותרת, פירות (ירכי ורד)", "petals, fruit (rose hips)"], season: ["אביב - סתיו", "spring - autumn"], warning: ["להוציא את השערות שבתוך הפרי. לא לאכול ורדים מרוססים.", "Remove the hairs inside the hips. Do not eat sprayed roses."] },
+
+      // --- Nuts and seeds ---
+      { sci: "Pistacia", genus: true, he: ["אלה", "אלה ארץ ישראלית", "אלה אטלנטית", "אלת המסטיק", "פיסטוק"], en: "Pistachio / Terebinth", parts: ["זרעים (פיסטוק), פירות קטנים כתבלין", "seeds (pistachio), small fruit as spice"], season: ["סוף קיץ - סתיו", "late summer - autumn"] },
+      { sci: "Juglans regia", he: ["אגוז", "אגוז המלך"], en: "Walnut", parts: ["אגוזים", "nuts"], season: ["סתיו", "autumn"] },
+      { sci: "Pinus pinea", he: ["אורן הצנובר", "צנובר"], en: "Stone pine", parts: ["זרעים (צנוברים)", "seeds (pine nuts)"], season: ["חורף", "winter"], warning: ["רק אורן הצנובר - לזרעי אורנים אחרים אין ערך מאכל.", "Only the stone pine - other pines have no useful nuts."] },
+      { sci: "Macadamia integrifolia", alt: ["Macadamia tetraphylla"], he: ["מקדמיה"], en: "Macadamia", parts: ["אגוזים", "nuts"], season: ["סתיו", "autumn"] },
+
+      // --- Herbs and spices ---
+      { sci: "Salvia rosmarinus", alt: ["Rosmarinus officinalis"], he: ["רוזמרין", "רוזמרין רפואי"], en: "Rosemary", parts: ["עלים, פרחים (תבלין)", "leaves, flowers (herb)"], season: ["כל השנה", "all year"] },
+      { sci: "Origanum syriacum", alt: ["Majorana syriaca"], he: ["זעתר", "אזוב", "אזוב מצוי"], en: "Syrian oregano (za'atar)", parts: ["עלים", "leaves"], season: ["כל השנה", "all year"], warning: ["צמח מוגן! לקטוף רק מצמחים שגדלו בגינה, לא בטבע.", "Protected plant! Pick only from gardens, not in nature."] },
+      { sci: "Salvia fruticosa", he: ["מרווה משולשת", "מרווה"], en: "Greek sage", parts: ["עלים (חליטה, תבלין)", "leaves (tea, herb)"], season: ["כל השנה", "all year"], warning: ["בטבע עלול להיות מוגן - עדיף לקטוף מגינה.", "May be protected in nature - better to pick from gardens."] },
+      { sci: "Salvia officinalis", he: ["מרווה רפואית"], en: "Sage", parts: ["עלים", "leaves"], season: ["כל השנה", "all year"] },
+      { sci: "Thymbra spicata", he: ["צתרה", "צתרה ורודה"], en: "Thymbra", parts: ["עלים (תבלין)", "leaves (herb)"], season: ["קיץ", "summer"] },
+      { sci: "Thymbra capitata", alt: ["Coridothymus capitatus", "Thymus capitatus"], he: ["קורנית", "קורנית מקורקפת"], en: "Conehead thyme", parts: ["עלים (תבלין, חליטה)", "leaves (herb, tea)"], season: ["קיץ", "summer"] },
+      { sci: "Clinopodium serpyllifolium", alt: ["Micromeria fruticosa"], he: ["זוטה לבנה", "זוטה"], en: "White micromeria", parts: ["עלים (חליטה)", "leaves (tea)"], season: ["כל השנה", "all year"] },
+      { sci: "Mentha", genus: true, he: ["נענע", "מנטה", "נענע משובלת"], en: "Mint", parts: ["עלים", "leaves"], season: ["כל השנה", "all year"] },
+      { sci: "Melissa officinalis", he: ["מליסה", "מליסה רפואית"], en: "Lemon balm", parts: ["עלים", "leaves"], season: ["כל השנה", "all year"] },
+      { sci: "Aloysia citrodora", he: ["לואיזה", "ליפיה"], en: "Lemon verbena", parts: ["עלים (חליטה)", "leaves (tea)"], season: ["אביב - סתיו", "spring - autumn"] },
+      { sci: "Ocimum basilicum", he: ["ריחן", "בזיליקום"], en: "Basil", parts: ["עלים", "leaves"], season: ["קיץ", "summer"] },
+      { sci: "Lavandula", genus: true, he: ["לבנדר", "אזוביון"], en: "Lavender", parts: ["פרחים (בכמות קטנה, תבלין וחליטה)", "flowers (small amounts, herb and tea)"], season: ["אביב - קיץ", "spring - summer"] },
+      { sci: "Laurus nobilis", he: ["ער", "ער אציל", "עלי דפנה"], en: "Bay laurel", parts: ["עלים (תבלין)", "leaves (herb)"], season: ["כל השנה", "all year"], warning: ["לא לבלבל עם הרדוף הנחלים - צמח רעיל מאוד!", "Do not confuse with oleander - a very poisonous plant!"] },
+      { sci: "Petroselinum crispum", he: ["פטרוזיליה"], en: "Parsley", parts: ["עלים", "leaves"], season: ["כל השנה", "all year"] },
+      { sci: "Coriandrum sativum", he: ["כוסברה"], en: "Coriander", parts: ["עלים, זרעים", "leaves, seeds"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Anethum graveolens", he: ["שמיר"], en: "Dill", parts: ["עלים, זרעים", "leaves, seeds"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Foeniculum vulgare", he: ["שומר", "שומר פשוט"], en: "Fennel", parts: ["עלים, גבעולים, זרעים, בצל", "leaves, stems, seeds, bulb"], season: ["חורף - אביב", "winter - spring"], warning: ["דומה מאוד לרוש ולצמחים רעילים אחרים ממשפחת הסוככיים. לבדוק ריח אניס ברור!", "Looks like poison hemlock and other toxic carrot-family plants. Check for a clear anise smell!"] },
+      { sci: "Rhus coriaria", he: ["אוג", "אוג הבורסקאים", "סומאק"], en: "Sumac", parts: ["פירות (תבלין)", "fruit (spice)"], season: ["סוף קיץ", "late summer"] },
+      { sci: "Capparis", genus: true, he: ["צלף", "צלף קוצני"], en: "Caper", parts: ["ניצני פרחים ופירות (אחרי כבישה)", "flower buds and fruit (pickled)"], season: ["אביב - קיץ", "spring - summer"] },
+
+      // --- Wild greens ---
+      { sci: "Malva", genus: true, he: ["חלמית", "חוביזה", "חלמית גדולה", "חלמית קטנת פרחים"], en: "Mallow", parts: ["עלים, פרחים, פירות צעירים", "leaves, flowers, young fruit"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Sinapis", genus: true, he: ["חרדל", "חרדל השדה", "חרדל לבן"], en: "Mustard", parts: ["עלים צעירים, פרחים, זרעים", "young leaves, flowers, seeds"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Brassica", genus: true, he: ["כרוב", "כרובית", "ברוקולי", "חרדל שחור"], en: "Cabbage / Mustard", parts: ["עלים, פרחים, זרעים", "leaves, flowers, seeds"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Raphanus", genus: true, he: ["צנון", "צנון מצוי", "צנונית"], en: "Radish", parts: ["שורש, עלים צעירים, תרמילים", "root, young leaves, pods"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Eruca", genus: true, he: ["ארוגולה", "רוקט"], en: "Rocket", parts: ["עלים, פרחים", "leaves, flowers"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Portulaca oleracea", he: ["רגלה", "רגלת הגינה"], en: "Purslane", parts: ["עלים, גבעולים", "leaves, stems"], season: ["קיץ", "summer"] },
+      { sci: "Urtica", genus: true, he: ["סרפד"], en: "Nettle", parts: ["עלים צעירים (מבושלים בלבד)", "young leaves (cooked only)"], season: ["חורף", "winter"], warning: ["צורב בנגיעה - ללבוש כפפות ולבשל לפני אכילה.", "Stings when touched - wear gloves and cook before eating."] },
+      { sci: "Oxalis pes-caprae", he: ["חמציץ", "חמציץ נטוי"], en: "Bermuda buttercup", parts: ["עלים, פרחים, גבעולים", "leaves, flowers, stems"], season: ["חורף", "winter"], warning: ["מכיל חומצה אוקסלית - לאכול בכמות קטנה.", "Contains oxalic acid - eat only small amounts."] },
+      { sci: "Chenopodium album", he: ["כף אווז", "כף אווז לבנה"], en: "Fat hen", parts: ["עלים (עדיף מבושלים)", "leaves (best cooked)"], season: ["חורף - אביב", "winter - spring"], warning: ["מכיל חומצה אוקסלית - במתינות.", "Contains oxalic acid - in moderation."] },
+      { sci: "Amaranthus", genus: true, he: ["ירבוז"], en: "Amaranth", parts: ["עלים, זרעים", "leaves, seeds"], season: ["קיץ", "summer"] },
+      { sci: "Sonchus oleraceus", he: ["מררית", "מררית הגינה"], en: "Sow thistle", parts: ["עלים צעירים", "young leaves"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Cichorium", genus: true, he: ["עולש", "עולש מצוי", "עולש הגינה"], en: "Chicory", parts: ["עלים, פרחים, שורשים", "leaves, flowers, roots"], season: ["חורף", "winter"] },
+      { sci: "Taraxacum", genus: true, he: ["שן הארי"], en: "Dandelion", parts: ["עלים, פרחים, שורשים", "leaves, flowers, roots"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Beta vulgaris", he: ["סלק", "סלק מצוי", "מנגולד"], en: "Beet / Chard", parts: ["עלים, שורש", "leaves, root"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Spinacia oleracea", he: ["תרד"], en: "Spinach", parts: ["עלים", "leaves"], season: ["חורף", "winter"] },
+      { sci: "Lactuca sativa", he: ["חסה"], en: "Lettuce", parts: ["עלים", "leaves"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Nasturtium officinale", he: ["גרגר הנחלים"], en: "Watercress", parts: ["עלים", "leaves"], season: ["חורף - אביב", "winter - spring"], warning: ["לקטוף רק ממים נקיים וזורמים - עלול להכיל טפילים.", "Pick only from clean running water - may carry parasites."] },
+      { sci: "Tropaeolum majus", he: ["כובע הנזיר"], en: "Nasturtium", parts: ["עלים, פרחים, זרעים", "leaves, flowers, seeds"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Borago officinalis", he: ["בוראגו", "לשון פר"], en: "Borage", parts: ["פרחים, עלים צעירים (במתינות)", "flowers, young leaves (in moderation)"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Calendula officinalis", he: ["ציפורני חתול"], en: "Pot marigold", parts: ["עלי כותרת", "petals"], season: ["חורף - אביב", "winter - spring"] },
+      { sci: "Hibiscus sabdariffa", he: ["כרכדה", "היביסקוס"], en: "Roselle", parts: ["גביעי הפרח (חליטה)", "flower calyces (tea)"], season: ["סתיו", "autumn"] },
+      { sci: "Moringa oleifera", he: ["מורינגה"], en: "Moringa", parts: ["עלים, תרמילים צעירים", "leaves, young pods"], season: ["קיץ", "summer"] },
+      { sci: "Allium", genus: true, he: ["שום", "בצל", "כרישה", "שום גבוה"], en: "Onion / Garlic", parts: ["בצל, עלים, פרחים", "bulb, leaves, flowers"], season: ["חורף - אביב", "winter - spring"], warning: ["בטבע: אכיל רק אם יש ריח שום/בצל ברור. רבים ממיני השום הבר מוגנים.", "In the wild: only if it clearly smells of garlic/onion. Many wild species are protected."] },
+      { sci: "Asparagus", genus: true, he: ["אספרגוס", "אספרגוס החורש"], en: "Asparagus", parts: ["נצרים צעירים", "young shoots"], season: ["אביב", "spring"], warning: ["הפירות (הגרגרים) רעילים.", "The berries are toxic."] },
+
+      // --- Thistles and vegetables ---
+      { sci: "Gundelia tournefortii", he: ["עכובית", "עכובית הגלגל", "עכוב"], en: "Gundelia", parts: ["גבעולים וניצנים צעירים (אחרי הסרת הקוצים)", "young stems and buds (spines removed)"], season: ["אביב", "spring"] },
+      { sci: "Silybum marianum", he: ["גדילן", "גדילן מצוי"], en: "Milk thistle", parts: ["גבעולים קלופים, עלים צעירים", "peeled stems, young leaves"], season: ["אביב", "spring"] },
+      { sci: "Notobasis syriaca", he: ["ברקן", "ברקן סורי"], en: "Syrian thistle", parts: ["גבעולים קלופים", "peeled stems"], season: ["אביב", "spring"] },
+      { sci: "Cynara", genus: true, he: ["קנרס", "קנרס סורי", "ארטישוק"], en: "Artichoke", parts: ["תפרחת צעירה, גבעולים", "young flower head, stems"], season: ["אביב", "spring"] },
+      { sci: "Solanum lycopersicum", he: ["עגבנייה", "עגבניה"], en: "Tomato", parts: ["פירות בשלים", "ripe fruit"], season: ["קיץ", "summer"], warning: ["העלים והגבעולים אינם למאכל.", "Leaves and stems are not edible."] }
+    ];
+
+    /* =====================================================================
+       3. SMALL HELPER FUNCTIONS
        ===================================================================== */
 
     // Shortcut for document.getElementById
@@ -568,9 +981,19 @@
       }[ch]));
     }
 
-    // Only allow https image links (safety)
-    function safeImageUrl(url) {
+    // Only allow https links (safety)
+    function safeUrl(url) {
       return typeof url === "string" && url.startsWith("https://") ? url : "";
+    }
+
+    // Makes text easy to compare: lowercase, no Hebrew vowel marks, no punctuation
+    function normalize(text) {
+      return String(text ?? "")
+        .toLowerCase()
+        .replace(/[֑-ׇ]/g, "")       // Hebrew niqqud
+        .replace(/[-'"׳״×]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     // Waits until the user stops typing before running fn (saves API calls)
@@ -589,7 +1012,7 @@
       toast.textContent = message;
       toast.className = "show" + (isError ? " error" : "");
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => (toast.className = ""), 4000);
+      toastTimer = setTimeout(() => (toast.className = ""), 4500);
     }
 
     // Open / close a modal window by its id
@@ -604,11 +1027,55 @@
       if (e.target.classList.contains("modal-backdrop")) closeModal(e.target.id);
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { closeModal("infoModal"); closeModal("addModal"); }
+      if (e.key === "Escape") ["infoModal", "addModal", "nickModal"].forEach(closeModal);
     });
 
     /* =====================================================================
-       2. THE MAP (Leaflet)
+       4. EDIBILITY LOOKUP (uses the built-in list above)
+       ===================================================================== */
+
+    // Returns the matching entry from EDIBLE_PLANTS, or null if we don't know
+    function findEdible(scientificName) {
+      const full = normalize(scientificName);
+      if (!full) return null;
+      const genus = full.split(" ")[0];
+
+      // 1) species match, including old names and subspecies ("morus alba var. x" -> "morus alba")
+      const exact = EDIBLE_PLANTS.find((p) =>
+        !p.genus && [p.sci, ...(p.alt || [])].some((n) => {
+          const name = normalize(n);
+          return full === name || full.startsWith(name + " ");
+        }));
+      if (exact) return exact;
+
+      // 2) whole-genus match, e.g. any "Morus ..." is a mulberry
+      return EDIBLE_PLANTS.find((p) => p.genus && normalize(p.sci) === genus) || null;
+    }
+
+    // Searches the built-in list by Hebrew, English or scientific name
+    function searchEdibleList(query) {
+      const q = normalize(query);
+      if (q.length < 2) return [];
+      return EDIBLE_PLANTS.filter((p) =>
+        [...p.he, p.en, p.sci, ...(p.alt || [])].some((name) => normalize(name).includes(q))
+      ).slice(0, 6);
+    }
+
+    // The name of a list entry in the current language
+    function entryName(entry) {
+      return lang === "en" ? entry.en : entry.he[0];
+    }
+
+    // HTML for the edible / unknown badge
+    function edibleBadge(entry, small = false) {
+      const size = small ? " small" : "";
+      return entry
+        ? `<span class="badge edible${size}">${t("edible")}</span>`
+        : `<span class="badge unknown${size}">${t("unknownEdible")}</span>`;
+    }
+
+    /* =====================================================================
+       5. THE MAP (Leaflet)
        ===================================================================== */
 
     // Two base layers: streets and satellite
@@ -630,37 +1097,40 @@
       layers: [streetLayer]
     });
 
-    // Layer switcher (top-left, so it doesn't hide behind the side panel)
-    L.control.layers(
-      { "מפת רחובות": streetLayer, "לוויין": satelliteLayer },
-      null,
-      { position: "topleft", collapsed: true }
-    ).addTo(map);
+    // Layer switcher (re-created when the language changes, to translate its labels)
+    let layersControl = null;
+    function drawLayersControl() {
+      if (layersControl) layersControl.remove();
+      layersControl = L.control.layers(
+        { [t("streets")]: streetLayer, [t("satellite")]: satelliteLayer },
+        null,
+        { position: "topleft", collapsed: true }
+      ).addTo(map);
+    }
 
     // Custom "locate me" button
+    let locateBtn = null;
     const LocateControl = L.Control.extend({
       options: { position: "topleft" },
       onAdd() {
         const div = L.DomUtil.create("div", "leaflet-bar");
-        const btn = L.DomUtil.create("button", "locate-btn", div);
-        btn.type = "button";
-        btn.title = "המיקום שלי";
-        btn.textContent = "📍";
+        locateBtn = L.DomUtil.create("button", "locate-btn", div);
+        locateBtn.type = "button";
+        locateBtn.textContent = "📍";
         L.DomEvent.disableClickPropagation(div);
-        L.DomEvent.on(btn, "click", locateMe);
+        L.DomEvent.on(locateBtn, "click", locateMe);
         return div;
       }
     });
-    map.addControl(new LocateControl());
 
     let myLocationMarker = null;
 
     function locateMe() {
       if (!navigator.geolocation) {
-        showToast("הדפדפן שלך לא תומך באיתור מיקום", true);
+        showToast(t("noGeo"), true);
         return;
       }
-      showToast("מאתר מיקום...");
+      showToast(t("locating"));
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const latlng = [pos.coords.latitude, pos.coords.longitude];
@@ -668,16 +1138,12 @@
           if (myLocationMarker) myLocationMarker.remove();
           myLocationMarker = L.circleMarker(latlng, {
             radius: 9, color: "#fff", weight: 3, fillColor: "#1976d2", fillOpacity: 1
-          }).addTo(map).bindPopup("<div>אתם כאן</div>");
-          showToast("נמצא המיקום שלך");
+          }).addTo(map).bindPopup(`<div>${escapeHtml(t("youAreHere"))}</div>`);
+          showToast(t("located"));
         },
         (err) => {
-          const messages = {
-            1: "לא ניתנה הרשאה לגשת למיקום",
-            2: "לא ניתן לקבוע את המיקום כרגע",
-            3: "איתור המיקום לקח יותר מדי זמן"
-          };
-          showToast(messages[err.code] || "שגיאה באיתור המיקום", true);
+          const keys = { 1: "geoDenied", 2: "geoUnavailable", 3: "geoTimeout" };
+          showToast(t(keys[err.code] || "geoError"), true);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
@@ -693,174 +1159,401 @@
     });
 
     /* =====================================================================
-       3. TREFLE API (plant information)
+       6. PLANT INFORMATION APIs (iNaturalist + Wikipedia)
        ===================================================================== */
 
-    // One function for all Trefle requests, with clear Hebrew errors
-    async function trefleRequest(path, params = {}) {
-      if (!TREFLE_TOKEN || TREFLE_TOKEN === "PASTE_TOKEN_HERE") {
-        throw new Error("לא הוגדר טוקן של Trefle בקוד");
-      }
-      const url = new URL(TREFLE_BASE + path);
-      url.searchParams.set("token", TREFLE_TOKEN);
+    // One function for all iNaturalist requests, with clear error messages
+    async function inatRequest(path, params = {}) {
+      const url = new URL(INAT_BASE + path);
       for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
       let response;
       try {
         response = await fetch(url);
       } catch {
-        // fetch() itself fails on no internet or when the browser blocks the request (CORS)
-        throw new Error("אין חיבור לשירות המידע על צמחים (בעיית רשת או CORS)");
+        throw new Error(t("networkError"));
       }
-
-      if (response.status === 401) throw new Error("טוקן Trefle לא תקין");
-      if (response.status === 404) throw new Error("הצמח לא נמצא במאגר");
-      if (response.status === 429) throw new Error("יותר מדי בקשות - נסו שוב בעוד דקה");
-      if (!response.ok) throw new Error("שגיאה מהשרת של Trefle (" + response.status + ")");
-
+      if (response.status === 429) throw new Error(t("tooManyRequests"));
+      if (!response.ok) throw new Error(t("serverError", { code: response.status }));
       return response.json();
     }
 
-    // Search plants by name -> returns an array of results
-    async function searchPlants(query) {
-      const json = await trefleRequest("/plants/search", { q: query });
-      return json.data || [];
-    }
-
-    // Full details for one species, by its slug (e.g. "ficus-carica")
-    async function getSpecies(slug) {
-      const json = await trefleRequest("/species/" + encodeURIComponent(slug));
-      return json.data;
-    }
-
-    // Trefle gives edible_part as an array like ["fruits","leaves"] -> make it text
-    function ediblePartText(species) {
-      const parts = species && species.edible_part;
-      return Array.isArray(parts) && parts.length ? parts.join(", ") : "";
-    }
-
-    // Decide whether to show the "edible" badge
-    function isEdible(species) {
-      return species.edible === true || species.vegetable === true || ediblePartText(species) !== "";
-    }
-
-    // Turns true/false/null into Hebrew
-    function yesNo(value) {
-      if (value === true) return "כן";
-      if (value === false) return "לא";
-      return "לא ידוע";
-    }
-
-    // Draws a list of search results inside a <ul>; onPick runs when one is clicked
-    function renderResults(listEl, plants, onPick) {
-      listEl.innerHTML = "";
-      plants.slice(0, 12).forEach((plant) => {
-        const li = document.createElement("li");
-        const img = safeImageUrl(plant.image_url);
-        li.innerHTML = `
-          ${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy">` : '<div class="no-img">🌱</div>'}
-          <div>
-            <strong>${escapeHtml(plant.common_name || plant.scientific_name)}</strong>
-            <small>${escapeHtml(plant.scientific_name)}${plant.family ? " · " + escapeHtml(plant.family) : ""}</small>
-          </div>`;
-        li.addEventListener("click", () => onPick(plant));
-        listEl.appendChild(li);
+    // Search plants by name. iNaturalist sorts by popularity, so the common species comes first.
+    async function searchInat(query) {
+      const json = await inatRequest("/taxa/autocomplete", {
+        q: query, locale: lang, taxon_id: INAT_PLANTS_ID, per_page: 12, is_active: true
       });
+      const usefulRanks = ["species", "hybrid", "subspecies", "variety", "genus"];
+      return (json.results || []).filter((tx) => usefulRanks.includes(tx.rank));
     }
 
-    // Shows a one-line message (loading / error / no results) inside a results list
-    function renderListMessage(listEl, text, isError = false) {
-      listEl.innerHTML = `<li class="message${isError ? " error" : ""}">${escapeHtml(text)}</li>`;
+    // Full details of one taxon by its iNaturalist id (always in Hebrew, to get the Hebrew name;
+    // the English name comes in "english_common_name")
+    async function getTaxon(id) {
+      const json = await inatRequest("/taxa/" + encodeURIComponent(id), { locale: "he" });
+      return (json.results || [])[0] || null;
     }
 
-    // Opens the info modal and fills it with species details
-    async function showPlantInfo(slug) {
+    // Find a taxon by its scientific name (for plants saved without an id)
+    async function findTaxonByName(scientificName) {
+      const json = await inatRequest("/taxa/autocomplete", {
+        q: scientificName, taxon_id: INAT_PLANTS_ID, per_page: 5
+      });
+      const results = json.results || [];
+      const match = results.find((tx) => normalize(tx.name) === normalize(scientificName)) || results[0];
+      return match ? getTaxon(match.id) : null;
+    }
+
+    // Short summary from Wikipedia. Returns null if there is no article.
+    async function wikiSummary(wikiLang, title) {
+      if (!title) return null;
+      try {
+        const url = `https://${wikiLang}.wikipedia.org/api/rest_v1/page/summary/` +
+          encodeURIComponent(title.replace(/ /g, "_"));
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const json = await response.json();
+        if (json.type !== "standard" || !json.extract) return null;
+        return { text: json.extract, url: json.content_urls?.desktop?.page || "", lang: wikiLang };
+      } catch {
+        return null; // Wikipedia is "nice to have" - ignore its errors
+      }
+    }
+
+    // Wikipedia in the page's language first, then the other language
+    async function getWiki(hebrewName, englishName, scientificName) {
+      if (lang === "en") {
+        return (await wikiSummary("en", scientificName)) ||
+               (await wikiSummary("en", englishName)) ||
+               (await wikiSummary("he", hebrewName));
+      }
+      return (await wikiSummary("he", hebrewName)) ||
+             (await wikiSummary("he", scientificName)) ||
+             (await wikiSummary("en", scientificName));
+    }
+
+    /* ---------- Search results: built-in list first, then iNaturalist ---------- */
+
+    // Converts both kinds of results into one simple shape for display
+    function listItem(entry) {
+      const otherName = lang === "en" ? entry.he[0] : entry.en;
+      return {
+        title: entryName(entry),
+        subtitle: entry.sci + (entry.genus ? " " + t("allSpecies") : "") + " · " + otherName,
+        image: "",
+        sci: entry.sci,
+        taxonId: 0,
+        edible: entry
+      };
+    }
+    function inatItem(taxon) {
+      const common = taxon.preferred_common_name;
+      const english = taxon.english_common_name;
+      return {
+        title: common || english || taxon.name,
+        subtitle: taxon.name + (taxon.rank === "genus" ? " " + t("genus") : "") +
+                  (english && english !== common ? " · " + english : ""),
+        image: safeUrl(taxon.default_photo?.square_url),
+        sci: taxon.name,
+        taxonId: taxon.id,
+        edible: findEdible(taxon.name)
+      };
+    }
+
+    // Draws result items inside a <ul>; onPick runs when one is clicked
+    function renderResults(listEl, sections, onPick) {
+      listEl.innerHTML = "";
+      for (const section of sections) {
+        if (section.items.length === 0 && !section.message) continue;
+
+        const header = document.createElement("li");
+        header.className = "section";
+        header.textContent = section.title;
+        listEl.appendChild(header);
+
+        if (section.message) {
+          const li = document.createElement("li");
+          li.className = "message" + (section.isError ? " error" : "");
+          li.textContent = section.message;
+          listEl.appendChild(li);
+        }
+
+        for (const item of section.items) {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            ${item.image ? `<img src="${escapeHtml(item.image)}" alt="" loading="lazy">` : '<div class="no-img">🌿</div>'}
+            <div class="result-text">
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>${escapeHtml(item.subtitle)}</small>
+            </div>
+            ${item.edible ? `<span class="edible-mark">${t("edible")}</span>` : ""}`;
+          li.addEventListener("click", () => onPick(item));
+          listEl.appendChild(li);
+        }
+      }
+    }
+
+    // Runs a search and keeps the dropdown updated.
+    // The built-in list shows instantly; iNaturalist results are added when they arrive.
+    function createSearch(inputEl, listEl, onPick) {
+      let counter = 0; // used to ignore old, slow answers
+
+      async function run() {
+        const query = inputEl.value.trim();
+        if (query.length < 2) { listEl.innerHTML = ""; return; }
+
+        const myTurn = ++counter;
+        const listItems = searchEdibleList(query).map(listItem);
+        const listSection = { title: t("listSection"), items: listItems };
+        renderResults(listEl, [listSection, { title: "iNaturalist", items: [], message: t("searching") }], onPick);
+
+        let inatSection;
+        try {
+          const shownNames = new Set(listItems.map((i) => normalize(i.sci)));
+          const taxa = (await searchInat(query)).filter((tx) => !shownNames.has(normalize(tx.name)));
+          inatSection = { title: t("inatSection"), items: taxa.map(inatItem) };
+          if (taxa.length === 0 && listItems.length === 0) inatSection.message = t("noResults");
+        } catch (err) {
+          inatSection = { title: "iNaturalist", items: [], message: err.message, isError: true };
+        }
+        if (myTurn === counter) renderResults(listEl, [listSection, inatSection], onPick);
+      }
+
+      inputEl.addEventListener("input", debounce(run, 400));
+      return run;
+    }
+
+    /* ---------- The "more info" window ---------- */
+    async function showPlantInfo({ taxonId, scientificName, name }) {
       const box = $("infoContent");
-      box.innerHTML = "<p>טוען מידע...</p>";
+      box.innerHTML = `<p>${t("loading")}</p>`;
       openModal("infoModal");
 
+      let taxon = null;
+      let errorText = "";
       try {
-        const s = await getSpecies(slug);
-        const img = safeImageUrl(s.image_url);
-        const edible = isEdible(s);
-        box.innerHTML = `
-          <h2>${escapeHtml(s.common_name || s.scientific_name)}</h2>
-          <span class="badge ${edible ? "edible" : "not-edible"}">
-            ${edible ? "✅ אכיל" : "❔ לא ידוע כאכיל"}
-          </span>
-          ${img ? `<img class="plant-img" src="${escapeHtml(img)}" alt="${escapeHtml(s.scientific_name)}">` : ""}
-          <table class="info-table">
-            <tr><th>שם נפוץ</th><td>${escapeHtml(s.common_name || "—")}</td></tr>
-            <tr><th>שם מדעי</th><td><em>${escapeHtml(s.scientific_name)}</em></td></tr>
-            <tr><th>משפחה</th><td>${escapeHtml(s.family || "—")}${s.family_common_name ? " (" + escapeHtml(s.family_common_name) + ")" : ""}</td></tr>
-            <tr><th>אכיל?</th><td>${yesNo(s.edible)}</td></tr>
-            <tr><th>חלק אכיל</th><td>${escapeHtml(ediblePartText(s) || "—")}</td></tr>
-            <tr><th>ירק?</th><td>${yesNo(s.vegetable)}</td></tr>
-          </table>
-          <p class="small-warning">⚠️ המידע מגיע ממאגר Trefle ועלול להיות חלקי או שגוי.
-            אל תאכלו צמח בר בלי זיהוי ודאי של 100%.</p>`;
+        if (taxonId) taxon = await getTaxon(taxonId);
+        else if (scientificName) taxon = await findTaxonByName(scientificName);
       } catch (err) {
-        box.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+        errorText = err.message;
       }
+
+      const sci = taxon?.name || scientificName || "";
+      const edible = findEdible(sci);
+      const hebrewName = edible?.he[0] || taxon?.preferred_common_name || "";
+      const englishName = taxon?.english_common_name || edible?.en || "";
+      const title = (lang === "en" ? englishName || hebrewName : hebrewName || englishName) || name || sci || t("plant");
+      const family = (taxon?.ancestors || []).find((a) => a.rank === "family");
+      const photo = taxon?.default_photo;
+      const wiki = await getWiki(hebrewName, englishName, sci);
+
+      box.innerHTML = `
+        <h2>${escapeHtml(title)}</h2>
+        ${edibleBadge(edible)}
+        ${photo && safeUrl(photo.medium_url) ? `
+          <img class="plant-img" src="${escapeHtml(safeUrl(photo.medium_url))}" alt="${escapeHtml(sci)}">
+          <p class="photo-credit">${escapeHtml(photo.attribution || "")}</p>` : ""}
+        <table class="info-table">
+          <tr><th>${t("hebrewName")}</th><td>${escapeHtml(hebrewName || "—")}</td></tr>
+          <tr><th>${t("englishName")}</th><td>${escapeHtml(englishName || "—")}</td></tr>
+          <tr><th>${t("sciName")}</th><td><em>${escapeHtml(sci || "—")}</em></td></tr>
+          <tr><th>${t("family")}</th><td>${family ? escapeHtml((family.preferred_common_name ? family.preferred_common_name + " - " : "") + family.name) : "—"}</td></tr>
+          ${edible ? `
+            <tr><th>${t("edibleParts")}</th><td>${escapeHtml(tr(edible.parts))}</td></tr>
+            <tr><th>${t("season")}</th><td>${escapeHtml(tr(edible.season) || "—")}</td></tr>` : ""}
+        </table>
+        ${edible?.warning ? `<p class="small-warning">⚠️ ${escapeHtml(tr(edible.warning))}</p>` : ""}
+        ${!edible ? `<p class="note">${t("notInList")}</p>` : ""}
+        ${errorText ? `<p class="form-error">${escapeHtml(errorText)}</p>` : ""}
+        ${wiki ? `<p class="wiki-text" dir="${wiki.lang === "he" ? "rtl" : "ltr"}">${escapeHtml(wiki.text)}</p>` : ""}
+        <div class="info-links">
+          ${wiki && safeUrl(wiki.url) ? `<a href="${escapeHtml(wiki.url)}" target="_blank" rel="noopener">${t("wikiLink")}</a>` : ""}
+          ${taxon ? `<a href="https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}" target="_blank" rel="noopener">🔎 iNaturalist</a>` : ""}
+        </div>
+        <p class="small-warning">${t("safety")}</p>`;
     }
 
     /* ---------- The search box in the header ---------- */
     const searchInput = $("searchInput");
     const searchResults = $("searchResults");
-    let searchCounter = 0; // used to ignore old, slow answers
+    createSearch(searchInput, searchResults, (item) => {
+      searchResults.innerHTML = "";
+      showPlantInfo({ taxonId: item.taxonId, scientificName: item.sci, name: item.title });
+    });
 
-    async function runHeaderSearch() {
-      const query = searchInput.value.trim();
-      if (query.length < 2) { searchResults.innerHTML = ""; return; }
-
-      const myTurn = ++searchCounter;
-      renderListMessage(searchResults, "מחפש...");
-      try {
-        const plants = await searchPlants(query);
-        if (myTurn !== searchCounter) return; // a newer search already started
-        if (plants.length === 0) {
-          renderListMessage(searchResults, "לא נמצאו תוצאות. נסו שם באנגלית או שם מדעי.");
-          return;
-        }
-        renderResults(searchResults, plants, (plant) => {
-          searchResults.innerHTML = "";
-          showPlantInfo(plant.slug);
-        });
-      } catch (err) {
-        if (myTurn === searchCounter) renderListMessage(searchResults, err.message, true);
-      }
-    }
-
-    searchInput.addEventListener("input", debounce(runHeaderSearch, 500));
-    // Hide results when clicking somewhere else
+    // Hide dropdowns when clicking somewhere else
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".search-wrap")) searchResults.innerHTML = "";
+      if (!e.target.closest("#addForm .form-row")) $("nameSuggestions").innerHTML = "";
     });
 
     /* =====================================================================
-       4. FIREBASE / FIRESTORE (shared plant locations)
+       7. FIREBASE: DATABASE + LOGIN
        ===================================================================== */
 
     let db = null;
-    const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+    let auth = null;
+    let currentUser = null;
+    let myNickname = "";    // the nickname shown to others ("" = not chosen yet)
+    let myNicknameKey = ""; // lowercase version, used to make nicknames unique
 
-    if (firebaseReady) {
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      auth = getAuth(app);
+    } catch (err) {
+      console.error(err);
+      setStatus("firebaseError");
+      $("addBtn").disabled = true;
+    }
+
+    // Is the logged-in user allowed to delete this plant?
+    function canDelete(plant) {
+      if (!currentUser) return false;
+      return currentUser.uid === ADMIN_UID || currentUser.uid === plant.addedByUid;
+    }
+
+    /* ---------- Login / logout ---------- */
+    async function login() {
       try {
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
+        await signInWithPopup(auth, new GoogleAuthProvider());
+        return true;
       } catch (err) {
-        console.error(err);
-        showToast("שגיאה בחיבור ל-Firebase - בדקו את ההגדרות", true);
+        const keys = {
+          "auth/popup-blocked": "popupBlocked",
+          "auth/unauthorized-domain": "unauthorizedDomain",
+          "auth/operation-not-allowed": "notEnabled"
+        };
+        const silent = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"];
+        if (!silent.includes(err.code)) {
+          showToast(keys[err.code] ? t(keys[err.code]) : t("loginFailed", { msg: err.message }), true);
+        }
+        return false;
       }
     }
 
-    if (!db) {
-      $("statusLine").textContent = "Firebase לא מוגדר - אי אפשר לטעון או לשמור צמחים.";
-      $("addBtn").disabled = true;
-      $("addBtn").title = "צריך להדביק את firebaseConfig בקוד";
+    function drawAuthArea() {
+      const area = $("authArea");
+      if (!auth) { area.innerHTML = ""; return; }
+      if (!currentUser) {
+        area.innerHTML = `<button id="loginBtn" class="btn ghost">${t("login")}</button>`;
+        $("loginBtn").addEventListener("click", login);
+        return;
+      }
+      area.innerHTML = `
+        <button id="nickBtn" class="btn ghost" title="${escapeHtml(t("changeNick"))}">
+          ${myNickname ? "👤 " + escapeHtml(myNickname) : t("chooseNick")}</button>
+        <button id="logoutBtn" class="btn ghost small">${t("logout")}</button>`;
+      $("nickBtn").addEventListener("click", openNicknameForm);
+      $("logoutBtn").addEventListener("click", () => signOut(auth));
     }
 
-    // All plants we got from Firestore, and their map markers
+    /* ---------- Unique nicknames ----------
+       Two collections in Firestore make nicknames unique:
+       - users/{uid}         -> { nickname, nicknameKey }   (my nickname)
+       - nicknames/{key}     -> { uid }                     (who owns this nickname)
+       A document id can exist only once, so two users can never own the same key.
+       The key is the nickname in lowercase, so "Dana" and "dana" count as the same. */
+
+    function nicknameKeyOf(nickname) {
+      return nickname.toLowerCase();
+    }
+
+    // Letters (any language), numbers, space and _ - . '  (2-30 characters)
+    function isValidNickname(nickname) {
+      return /^[\p{L}\p{N} _.'-]{2,30}$/u.test(nickname)
+        && /[\p{L}\p{N}]/u.test(nickname)   // at least one letter or number
+        && !nickname.startsWith("__");      // Firestore reserves ids like __x__
+    }
+
+    async function loadMyNickname() {
+      myNickname = "";
+      myNicknameKey = "";
+      try {
+        const snap = await getDoc(doc(db, "users", currentUser.uid));
+        if (snap.exists()) {
+          myNickname = snap.data().nickname || "";
+          myNicknameKey = snap.data().nicknameKey || "";
+        }
+      } catch (err) {
+        console.error("Could not load nickname:", err);
+      }
+    }
+
+    function openNicknameForm() {
+      // Suggest the current nickname, or the first name from Google (never the full name)
+      $("nickInput").value = myNickname || (currentUser?.displayName || "").split(" ")[0].slice(0, 30);
+      $("nickError").textContent = "";
+      openModal("nickModal");
+      setTimeout(() => $("nickInput").focus(), 50);
+    }
+
+    $("nickForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!currentUser) return;
+
+      // Clean up: trim and turn multiple spaces into one
+      const nickname = $("nickInput").value.trim().replace(/\s+/g, " ");
+      if (!isValidNickname(nickname)) {
+        $("nickError").textContent = t("nickInvalid");
+        return;
+      }
+      const key = nicknameKeyOf(nickname);
+
+      $("nickSaveBtn").disabled = true;
+      $("nickError").textContent = "";
+      try {
+        // Friendly check first: is somebody else already using it?
+        if (key !== myNicknameKey) {
+          const taken = await getDoc(doc(db, "nicknames", key));
+          if (taken.exists() && taken.data().uid !== currentUser.uid) {
+            $("nickError").textContent = t("nickTaken", { name: nickname });
+            return;
+          }
+        }
+
+        // Save everything together (all or nothing)
+        const batch = writeBatch(db);
+        if (key !== myNicknameKey) {
+          batch.set(doc(db, "nicknames", key), { uid: currentUser.uid });
+          if (myNicknameKey) batch.delete(doc(db, "nicknames", myNicknameKey)); // free the old one
+        }
+        batch.set(doc(db, "users", currentUser.uid), { nickname, nicknameKey: key });
+        await batch.commit();
+
+        myNickname = nickname;
+        myNicknameKey = key;
+        closeModal("nickModal");
+        drawAuthArea();
+        showToast(t("nickSaved", { name: nickname }));
+      } catch (err) {
+        console.error(err);
+        // If two people pick the same nickname at the same moment, the rules reject the second one
+        $("nickError").textContent = err.code === "permission-denied"
+          ? t("nickTaken", { name: nickname })
+          : t("nickFailed", { msg: err.message });
+      } finally {
+        $("nickSaveBtn").disabled = false;
+      }
+    });
+
+    // Runs on page load and every time the user logs in or out
+    if (auth) {
+      onAuthStateChanged(auth, async (user) => {
+        currentUser = user;
+        myNickname = "";
+        myNicknameKey = "";
+        if (user) await loadMyNickname();
+        drawAuthArea();
+        refreshAllPopups(); // show/hide delete buttons
+        if (user && !myNickname) openNicknameForm(); // ask once per login if missing
+      });
+    }
+
+    /* =====================================================================
+       8. PLANTS FROM FIRESTORE (real time) + MARKERS
+       ===================================================================== */
+
     const plants = new Map();   // id -> plant data
     const markers = new Map();  // id -> Leaflet marker
     const markersLayer = L.layerGroup().addTo(map);
@@ -868,29 +1561,45 @@
     // HTML shown in a marker's popup
     function popupHtml(id, p) {
       const date = p.createdAt && p.createdAt.toDate
-        ? p.createdAt.toDate().toLocaleDateString("he-IL") : "";
+        ? p.createdAt.toDate().toLocaleDateString(lang === "en" ? "en-GB" : "he-IL") : "";
       return `
         <h3>${escapeHtml(p.name)}</h3>
         ${p.scientificName ? `<p class="sci">${escapeHtml(p.scientificName)}</p>` : ""}
-        ${p.ediblePart ? `<p><strong>חלק אכיל:</strong> ${escapeHtml(p.ediblePart)}</p>` : ""}
-        ${p.notes ? `<p><strong>הערות:</strong> ${escapeHtml(p.notes)}</p>` : ""}
-        ${date ? `<p><small>נוסף ב-${escapeHtml(date)}</small></p>` : ""}
-        <button class="btn more-info-btn" data-id="${escapeHtml(id)}">ℹ️ מידע נוסף</button>`;
+        ${edibleBadge(findEdible(p.scientificName), true)}
+        ${p.ediblePart ? `<p><strong>${t("ediblePartShort")}</strong> ${escapeHtml(p.ediblePart)}</p>` : ""}
+        ${p.notes ? `<p><strong>${t("notesShort")}</strong> ${escapeHtml(p.notes)}</p>` : ""}
+        <p><small>${escapeHtml(t("addedBy", { name: p.addedByName || t("unknownUser") }))}${date ? " · " + escapeHtml(date) : ""}</small></p>
+        <div class="popup-actions">
+          <button class="btn small more-info-btn" data-id="${escapeHtml(id)}">${t("moreInfo")}</button>
+          ${canDelete(p) ? `<button class="btn small danger delete-btn" data-id="${escapeHtml(id)}">${t("delete")}</button>` : ""}
+        </div>`;
     }
 
-    // "More info" button inside popups (the popup HTML is created later, so we listen on document)
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest(".more-info-btn");
-      if (!btn) return;
-      const p = plants.get(btn.dataset.id);
-      if (!p) return;
-      if (p.trefleSlug) {
-        showPlantInfo(p.trefleSlug);
-      } else {
-        // No Trefle link saved -> search by name instead
-        searchInput.value = p.scientificName || p.name;
-        searchInput.focus();
-        runHeaderSearch();
+    // Rebuild all popups (after login/logout or a language change)
+    function refreshAllPopups() {
+      markers.forEach((marker, id) => marker.setPopupContent(popupHtml(id, plants.get(id))));
+    }
+
+    // Buttons inside popups (the popup HTML is created later, so we listen on document)
+    document.addEventListener("click", async (e) => {
+      const infoBtn = e.target.closest(".more-info-btn");
+      if (infoBtn) {
+        const p = plants.get(infoBtn.dataset.id);
+        if (p) showPlantInfo({ taxonId: p.taxonId, scientificName: p.scientificName, name: p.name });
+        return;
+      }
+
+      const deleteBtn = e.target.closest(".delete-btn");
+      if (deleteBtn) {
+        const p = plants.get(deleteBtn.dataset.id);
+        if (!p || !confirm(t("confirmDelete", { name: p.name }))) return;
+        try {
+          await deleteDoc(doc(db, "plants", deleteBtn.dataset.id));
+          showToast(t("deleted"));
+        } catch (err) {
+          showToast(err.code === "permission-denied"
+            ? t("noDeletePerm") : t("deleteFailed", { msg: err.message }), true);
+        }
       }
     });
 
@@ -914,30 +1623,29 @@
             // Skip broken documents
             if (typeof p.lat !== "number" || typeof p.lng !== "number") return;
 
+            plants.set(id, p);
             const marker = L.marker([p.lat, p.lng], { icon: plantIcon, title: p.name })
               .bindPopup(popupHtml(id, p));
             markersLayer.addLayer(marker);
             markers.set(id, marker);
-            plants.set(id, p);
           });
-          $("statusLine").textContent = `סה"כ ${plants.size} צמחים במאגר`;
+          setStatus("totalPlants", { n: plants.size });
           renderPlantList();
         },
         (err) => {
           console.error(err);
-          $("statusLine").textContent = "שגיאה בטעינת הצמחים: " +
-            (err.code === "permission-denied" ? "אין הרשאת קריאה (בדקו את חוקי Firestore)" : err.message);
+          setStatus("loadError", { msg: err.code === "permission-denied" ? t("readDenied") : err.message });
         }
       );
     }
 
     /* =====================================================================
-       5. SIDE PANEL - list of plants visible on the map
+       9. SIDE PANEL - list of plants visible on the map
        ===================================================================== */
 
     function renderPlantList() {
       const list = $("plantList");
-      const filter = $("listFilter").value.trim().toLowerCase();
+      const filter = normalize($("listFilter").value);
       const bounds = map.getBounds();
 
       // Keep plants that are inside the visible map area AND match the filter
@@ -945,23 +1653,24 @@
         .filter(([, p]) => bounds.contains([p.lat, p.lng]))
         .filter(([, p]) => {
           if (!filter) return true;
-          const text = `${p.name} ${p.scientificName} ${p.ediblePart} ${p.notes}`.toLowerCase();
+          const text = normalize(`${p.name} ${p.scientificName} ${p.ediblePart} ${p.notes} ${p.addedByName}`);
           return text.includes(filter);
         })
-        .sort((a, b) => a[1].name.localeCompare(b[1].name, "he"));
+        .sort((a, b) => String(a[1].name).localeCompare(String(b[1].name), lang));
 
       $("visibleCount").textContent = visible.length;
 
       if (visible.length === 0) {
-        list.innerHTML = '<li class="empty">אין צמחים באזור הזה. הזיזו את המפה או הוסיפו צמח!</li>';
+        list.innerHTML = `<li class="empty">${escapeHtml(t("listEmpty"))}</li>`;
         return;
       }
 
       list.innerHTML = "";
       visible.forEach(([id, p]) => {
         const li = document.createElement("li");
-        li.innerHTML = `<strong>🌿 ${escapeHtml(p.name)}</strong>
-          <small>${escapeHtml(p.ediblePart || p.scientificName || "")}</small>`;
+        li.innerHTML = `<strong>${findEdible(p.scientificName) ? "✅" : "🌿"} ${escapeHtml(p.name)}</strong>
+          <small>${escapeHtml(p.ediblePart || p.scientificName || "")}</small>
+          ${p.addedByName ? `<small>${escapeHtml(t("addedBy", { name: p.addedByName }))}</small>` : ""}`;
         li.addEventListener("click", () => {
           map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16));
           markers.get(id)?.openPopup();
@@ -974,26 +1683,39 @@
     map.on("moveend", renderPlantList);
     $("listFilter").addEventListener("input", renderPlantList);
     $("panelToggle").addEventListener("click", () => $("sidePanel").classList.toggle("open"));
-    renderPlantList();
 
     /* =====================================================================
-       6. "ADD PLANT" MODE + FORM
+       10. "ADD PLANT" MODE + FORM
        ===================================================================== */
 
     let addingMode = false;
     let newPlantLatLng = null;   // where the user clicked
     let tempMarker = null;       // temporary marker while filling the form
-    let selectedTrefle = { slug: "", scientificName: "" };
+    let selected = { sci: "", taxonId: 0 }; // the plant picked from the suggestions
 
     function setAddingMode(on) {
       addingMode = on;
       $("addBtn").classList.toggle("active", on);
-      $("addBtn").textContent = on ? "✖ ביטול הוספה" : "➕ הוספת צמח";
+      $("addBtn").textContent = on ? t("cancelAdd") : t("addPlant");
       $("addHint").classList.toggle("show", on);
       $("map").classList.toggle("adding", on);
     }
 
-    $("addBtn").addEventListener("click", () => setAddingMode(!addingMode));
+    // Adding requires login AND a nickname
+    $("addBtn").addEventListener("click", async () => {
+      if (addingMode) { setAddingMode(false); return; }
+      if (!currentUser) {
+        showToast(t("needLogin"));
+        if (!(await login())) return;
+        await loadMyNickname();
+      }
+      if (!myNickname) {
+        showToast(t("needNickname"));
+        openNicknameForm();
+        return;
+      }
+      setAddingMode(true);
+    });
 
     // When in adding mode, a click on the map opens the form
     map.on("click", (e) => {
@@ -1004,9 +1726,10 @@
 
     function openAddForm(latlng) {
       newPlantLatLng = latlng;
-      selectedTrefle = { slug: "", scientificName: "" };
+      selected = { sci: "", taxonId: 0 };
       $("addForm").reset();
       $("formError").textContent = "";
+      $("pickedInfo").innerHTML = "";
       $("nameSuggestions").innerHTML = "";
       $("locationText").value = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
 
@@ -1027,69 +1750,37 @@
 
     /* ---------- Autocomplete for the plant name ---------- */
     const nameInput = $("plantName");
-    const nameSuggestions = $("nameSuggestions");
-    let suggestCounter = 0;
 
-    async function runNameSuggest() {
-      const query = nameInput.value.trim();
-      if (query.length < 2) { nameSuggestions.innerHTML = ""; return; }
-
-      const myTurn = ++suggestCounter;
-      renderListMessage(nameSuggestions, "מחפש...");
-      try {
-        const results = await searchPlants(query);
-        if (myTurn !== suggestCounter) return;
-        if (results.length === 0) {
-          renderListMessage(nameSuggestions, "לא נמצא במאגר - אפשר לשמור עם השם שהקלדתם");
-          return;
-        }
-        renderResults(nameSuggestions, results, pickSuggestion);
-      } catch (err) {
-        if (myTurn === suggestCounter) {
-          renderListMessage(nameSuggestions, err.message + " - אפשר לשמור גם בלי", true);
-        }
-      }
-    }
-
-    // The user picked a plant from the suggestions
-    async function pickSuggestion(plant) {
-      nameSuggestions.innerHTML = "";
-      nameInput.value = (plant.common_name || plant.scientific_name || "").slice(0, LIMITS.name);
-      selectedTrefle = { slug: plant.slug || "", scientificName: plant.scientific_name || "" };
-      $("scientificName").value = selectedTrefle.scientificName;
-
-      // Fetch the details to fill in the edible part
-      $("ediblePart").placeholder = "טוען...";
-      try {
-        const species = await getSpecies(plant.slug);
-        const part = ediblePartText(species);
-        if (part) $("ediblePart").value = part.slice(0, LIMITS.ediblePart);
-      } catch {
-        // Not critical - the user can type it manually
-      }
-      $("ediblePart").placeholder = "למשל: פירות, עלים";
-    }
-
+    // Typing again means the previous selection is no longer valid
     nameInput.addEventListener("input", () => {
-      // Typing again means the previous Trefle selection is no longer valid
-      selectedTrefle = { slug: "", scientificName: "" };
+      selected = { sci: "", taxonId: 0 };
       $("scientificName").value = "";
+      $("pickedInfo").innerHTML = "";
     });
-    nameInput.addEventListener("input", debounce(runNameSuggest, 500));
+
+    createSearch(nameInput, $("nameSuggestions"), (item) => {
+      $("nameSuggestions").innerHTML = "";
+      nameInput.value = item.title.slice(0, LIMITS.name);
+      selected = { sci: item.sci, taxonId: item.taxonId };
+      $("scientificName").value = item.sci;
+      $("pickedInfo").innerHTML = `<p>${edibleBadge(item.edible, true)}
+        ${item.edible?.warning ? `<span class="note">⚠️ ${escapeHtml(tr(item.edible.warning))}</span>` : ""}</p>`;
+      if (item.edible && !$("ediblePart").value.trim()) {
+        $("ediblePart").value = tr(item.edible.parts).slice(0, LIMITS.ediblePart);
+      }
+    });
 
     /* ---------- Validation (same rules as in Firestore) ---------- */
     function validatePlant(data) {
-      if (!data.name) return "יש להזין שם צמח";
+      if (!data.name) return t("nameRequired");
       for (const [field, max] of Object.entries(LIMITS)) {
-        if (typeof data[field] !== "string") return "שדה לא תקין: " + field;
-        if (data[field].length > max) return `השדה ארוך מדי (מקסימום ${max} תווים)`;
+        if (typeof data[field] !== "string") return t("fieldInvalid", { field });
+        if (data[field].length > max) return t("tooLong", { max });
       }
-      if (typeof data.lat !== "number" || !isFinite(data.lat) || data.lat < -90 || data.lat > 90) {
-        return "קו רוחב לא תקין";
-      }
-      if (typeof data.lng !== "number" || !isFinite(data.lng) || data.lng < -180 || data.lng > 180) {
-        return "קו אורך לא תקין";
-      }
+      if (!data.addedByName) return t("needNickname");
+      if (!Number.isInteger(data.taxonId) || data.taxonId < 0) return t("badTaxon");
+      if (typeof data.lat !== "number" || !isFinite(data.lat) || data.lat < -90 || data.lat > 90) return t("badLat");
+      if (typeof data.lng !== "number" || !isFinite(data.lng) || data.lng < -180 || data.lng > 180) return t("badLng");
       return null; // null = everything is OK
     }
 
@@ -1097,15 +1788,21 @@
     $("addForm").addEventListener("submit", async (e) => {
       e.preventDefault(); // don't reload the page
       if (!db) return;
+      if (!currentUser) {
+        $("formError").textContent = t("needLogin");
+        return;
+      }
 
       const data = {
         name: nameInput.value.trim(),
-        scientificName: selectedTrefle.scientificName,
-        trefleSlug: selectedTrefle.slug,
+        scientificName: selected.sci,
+        taxonId: selected.taxonId,
         ediblePart: $("ediblePart").value.trim(),
         notes: $("notes").value.trim(),
         lat: Number(newPlantLatLng?.lat),
-        lng: Number(newPlantLatLng?.lng)
+        lng: Number(newPlantLatLng?.lng),
+        addedByUid: currentUser.uid,
+        addedByName: myNickname
       };
 
       const error = validatePlant(data);
@@ -1119,16 +1816,53 @@
       try {
         await addDoc(collection(db, "plants"), { ...data, createdAt: serverTimestamp() });
         closeModal("addModal");
-        showToast("הצמח נשמר! תודה 🌱");
+        showToast(t("saved"));
       } catch (err) {
         console.error(err);
         $("formError").textContent = err.code === "permission-denied"
-          ? "השמירה נחסמה על ידי חוקי האבטחה של Firestore"
-          : "השמירה נכשלה: " + err.message;
+          ? t("saveBlocked") : t("saveFailed", { msg: err.message });
       } finally {
         $("saveBtn").disabled = false;
       }
     });
+
+    /* =====================================================================
+       11. APPLY THE LANGUAGE to the whole page
+       ===================================================================== */
+    function applyLanguage() {
+      const html = document.documentElement;
+      html.lang = lang;
+      html.dir = lang === "he" ? "rtl" : "ltr";
+      document.title = t("pageTitle");
+
+      // Fixed texts in the HTML
+      document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
+      document.querySelectorAll("[data-i18n-ph]").forEach((el) => (el.placeholder = t(el.dataset.i18nPh)));
+      document.querySelectorAll("[data-i18n-html]").forEach((el) => (el.innerHTML = t(el.dataset.i18nHtml)));
+
+      // Texts created by JavaScript
+      setAddingMode(addingMode);
+      drawAuthArea();
+      drawLayersControl();
+      if (locateBtn) locateBtn.title = t("myLocation");
+      setStatus(status.key, status.vars);
+      refreshAllPopups();
+      renderPlantList();
+
+      // Close things that show old-language content
+      searchResults.innerHTML = "";
+      closeModal("infoModal");
+    }
+
+    $("langBtn").addEventListener("click", () => {
+      lang = lang === "he" ? "en" : "he";
+      try { localStorage.setItem("lang", lang); } catch {}
+      applyLanguage();
+    });
+
+    // Start!
+    map.addControl(new LocateControl());
+    applyLanguage();
   </script>
 
   <!--
@@ -1136,32 +1870,84 @@
   FIRESTORE SECURITY RULES
   Copy everything between the lines into:
   Firebase console -> Firestore Database -> Rules -> Publish
-  Anyone can READ and CREATE plants (with validation), nobody can UPDATE or DELETE.
+  - plants:    anyone can read; logged-in users with a nickname can create
+               (validated, only in their own name); nobody can update;
+               delete = the user who added it, or the admin.
+  - users:     each user can read/write only their own nickname record.
+  - nicknames: public list of taken nicknames; makes every nickname unique.
   =====================================================================
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.uid == 'j9uBRpG3HuXV7JZ1rz5yuEem8Xj2';
+    }
+
+    // Path helpers
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+    function nicknamePath(key) {
+      return /databases/$(database)/documents/nicknames/$(key);
+    }
+
     // Checks that a new plant document looks exactly like the app sends it
     function isValidPlant(d) {
-      let fields = ['name', 'scientificName', 'trefleSlug', 'ediblePart',
-                    'notes', 'lat', 'lng', 'createdAt'];
+      let fields = ['name', 'scientificName', 'taxonId', 'ediblePart', 'notes',
+                    'lat', 'lng', 'addedByUid', 'addedByName', 'createdAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
         && d.name is string && d.name.trim().size() > 0 && d.name.size() <= 100
         && d.scientificName is string && d.scientificName.size() <= 150
-        && d.trefleSlug is string && d.trefleSlug.size() <= 150
+        && d.taxonId is int && d.taxonId >= 0
         && d.ediblePart is string && d.ediblePart.size() <= 200
         && d.notes is string && d.notes.size() <= 500
         && d.lat is number && d.lat >= -90 && d.lat <= 90
         && d.lng is number && d.lng >= -180 && d.lng <= 180
+        && d.addedByUid == request.auth.uid
+        // the name must be the user's own registered (unique) nickname
+        && d.addedByName == get(userPath(request.auth.uid)).data.nickname
         && d.createdAt == request.time;
     }
 
     match /plants/{plantId} {
       allow read: if true;
-      allow create: if isValidPlant(request.resource.data);
-      allow update, delete: if false;
+      allow create: if signedIn() && isValidPlant(request.resource.data);
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.get('addedByUid', '') == request.auth.uid);
+    }
+
+    // users/{uid} = { nickname, nicknameKey }
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nickname', 'nicknameKey'])
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 2
+        && request.resource.data.nickname.size() <= 30
+        && request.resource.data.nicknameKey == request.resource.data.nickname.lower()
+        // the nickname must be reserved for this user in the same save
+        && getAfter(nicknamePath(request.resource.data.nicknameKey)).data.uid == uid;
+      allow delete: if false;
+    }
+
+    // nicknames/{key} = { uid }. A document id is unique, so a nickname
+    // can be created only if nobody has it (there is no "update" rule).
+    match /nicknames/{key} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(userPath(request.auth.uid)).data.nicknameKey == key;
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && getAfter(userPath(request.auth.uid)).data.nicknameKey != key;
     }
 
     // Everything else in the database is closed
